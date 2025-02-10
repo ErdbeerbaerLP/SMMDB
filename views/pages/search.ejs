@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html>
+<head>
+
+
+    <%- include('../partials/head'); %>
+
+    <title>Search - Super Mario Maker Database</title>
+    <meta property="og:title" content="Search - Super Mario Maker Database"/>
+    <meta property="og:type" content="website"/>
+    <meta property="og:url" content="https://smm.pretendo.zip"/>
+    <meta property="og:description" content="Search thru the mario maker levels on Pretendo Network"/>
+    <meta name="theme-color" content="#ecce07">
+</head>
+<body>
+<%- include('../partials/header'); %>
+<div class="block search-form">
+    <h1>Search Courses</h1>
+    <form action="/course/search" method="post">
+        Search for... <input name="query" placeholder="Level Name"/><br>
+        And/Or... <input name="ownername" placeholder="Creator Name"/><br>
+        And/Or... <input name="pnid" placeholder="Creator PNID"/><br>
+        And/Or... <input type="number" name="ownerpid" placeholder="Creator PID"><br><br>
+        <hr>
+        Filter by...<br><br>
+        <label for="uploadmin">Uploaded after</label>
+        <input type="datetime-local" id="uploadmin" name="uploadmin"/>
+        <label for="uploadmax">Uploaded before:</label>
+        <input type="datetime-local" id="uploadmax" name="uploadmax"/><br>
+        <label for="minstars">Minimum Stars:</label>
+        <input type="number" id="minstars" name="minstars"/>
+        <label for="maxstars">Maximum Stars:</label>
+        <input type="number" id="maxstars" name="maxstars"/><br>
+        <label for="minobj">Minimum Objects:</label>
+        <input type="number" id="minobj" name="minobj"/>
+        <label for="maxobj">Maximum Objects:</label>
+        <input type="number" id="maxobj" name="maxobj"/><br>
+        <label for="hasSubworld">Has Subworld</label><br>
+        <select id="hasSubworld" name="hasSubworld">
+            <option value="ignore" selected>No Preference</option>
+            <option value="true">Yes</option>
+            <option value="false">No</option>
+        </select><br>
+        <label for="hasFirstClear">Has First Clear</label><br>
+        <select id="hasFirstClear" name="hasFirstClear">
+            <option value="ignore" selected>No Preference</option>
+            <option value="true">Yes</option>
+            <option value="false">No</option>
+        </select><br><br>
+
+        <label for="game">Game Style (supports multiple selections)</label><br>
+        <select id="game" name="game" multiple>
+            <option value="M1" selected>Super Mario Bros.</option>
+            <option value="M3" selected>Super Mario Bros. 3</option>
+            <option value="MW" selected>Super Mario World</option>
+            <option value="WU" selected>New Super Mario Bros. U</option>
+        </select><br>
+        <!--label for="ov_theme">Overworld Theme (supports multiple selections)</label><br>
+        <select id="ov_theme" name="ov_theme" multiple>
+          <option value="0" selected>Overworld</option>
+          <option value="1" selected>Underground</option>
+          <option value="2" selected>Castle</option>
+          <option value="3" selected>Airship</option>
+          <option value="4" selected>Underwater</option>
+          <option value="5" selected>Ghost House</option>
+        </select>
+        <label for="sub_theme">Subworld Theme (supports multiple selections)</label><br>
+        <select id="sub_theme" name="sub_theme" multiple>
+          <option value="0" selected>Overworld</option>
+          <option value="1" selected>Underground</option>
+          <option value="2" selected>Castle</option>
+          <option value="3" selected>Airship</option>
+          <option value="4" selected>Underwater</option>
+          <option value="5" selected>Ghost House</option>
+        </select>
+    </div-->
+        <label for="autoscroll">Autoscrolling (Overworld)</label><br>
+        <select id="autoscroll" name="autoscroll" multiple>
+            <option value="0" selected>Off</option>
+            <option value="1" selected>Slow</option>
+            <option value="2" selected>Medium</option>
+            <option value="3" selected>Fast</option>
+        </select><br>
+        <label for="subautoscroll">Autoscrolling (Subworld)</label><br>
+        <select id="subautoscroll" name="subautoscroll" multiple>
+            <option value="0" selected>Off</option>
+            <option value="1" selected>Slow</option>
+            <option value="2" selected>Medium</option>
+            <option value="3" selected>Fast</option>
+        </select>
+
+        <hr>
+        Sort by...<br><br>
+        <select id="sort" name="sort">
+            <option value="random" selected>Random</option>
+            <option value="star-asc">Star Count (Asc)</option>
+            <option value="star-desc">Star Count (Desc)</option>
+            <option value="obj-asc">Object Count [Overworld] (Asc)</option>
+            <option value="obj-desc">Object Count [Overworld] (Desc)</option>
+            <option value="subobj-asc">Object Count [Subworld] (Asc)</option>
+            <option value="subobj-desc">Object Count [Subworld] (Desc)</option>
+            <option value="upload-asc">Upload Date (Asc)</option>
+            <option value="upload-desc">Upload Date (Desc)</option>
+        </select>
+        <br>
+        <hr>
+        <br><br>
+        <input type="submit">
+    </form>
+    <br><br>
+    <br><br>
+    <br><br>
+    <br><br>
+</div>
+<%- include('../partials/footer'); %>
+</body>
+</html>

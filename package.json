@@ -1,0 +1,33 @@
+{
+  "name": "smmdb",
+  "version": "1.0.0",
+  "description": "Super Mario Maker Database website for Pretendo",
+  "main": "server.js",
+  "type": "module",
+  "scripts": {
+    "start": "node server.js",
+    "start-dotenv": "node --env-file=./.env server.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ErdbeerbaerLP/SMMDB.git"
+  },
+  "keywords": [
+    "mario",
+    "mario-maker",
+    "pretendo"
+  ],
+  "author": "ErdbeerbaerLP",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/ErdbeerbaerLP/SMMDB/issues"
+  },
+  "homepage": "https://github.com/ErdbeerbaerLP/SMMDB#readme",
+  "dependencies": {
+    "ejs": "^3.1.10",
+    "express": "^4.19.2",
+    "express-rate-limit": "^7.5.0",
+    "mariadb": "^3.4.0",
+    "node-zip": "^1.1.1"
+  }
+}

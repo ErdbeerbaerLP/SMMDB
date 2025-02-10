@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html>
+<head>
+
+
+    <%- include('../partials/head'); %>
+    <title>Super Mario Maker Database</title>
+    <meta property="og:title" content="Super Mario Maker Database"/>
+    <meta property="og:type" content="website"/>
+    <meta property="og:url" content="http://smm.pretendo.zip"/>
+    <meta property="og:description" content="Search thru the mario maker levels on Pretendo Network"/>
+    <meta name="theme-color" content="#ecce07">
+</head>
+<body>
+<%- include('../partials/header'); %>
+
+<h1>Random Courses</h1>
+<div class="cards">
+
+</div>
+<script>
+    let offset = 0;
+    let initial = true;
+    let donotload = false;
+    $(document).ready(function () {
+        function loadCourses() {
+            $.getJSON(`/api/course/search/${offset}?sort=random`, function (data) {
+                console.log(data.length === 0)
+                if (data.length === 0 && initial) {
+                    var cardHtml = `
+                            <div class="card">
+                                No results :/
+                            </div>
+                        `;
+                    $(".cards").append(cardHtml);
+                    initial = false;
+                } else {
+                    initial = false;
+                    var requests = data.map(levelData => {
+                        const timestamp = levelData.last_updated * 1000;
+                        const updated = new Date(timestamp).toLocaleString();
+                        const timestamp2 = levelData.creation * 1000;
+                        const uploaded = new Date(timestamp2).toLocaleString();
+
+                        // Construct the URL
+                        const url = `/partial/course?id=${levelData.levelid}&name=${encodeURIComponent(levelData.name)}&code=${levelData.levelcode}&stars=${levelData.stars}&userpid=${levelData.ownerid}&username=${encodeURIComponent(levelData.owner_name)}&userpnid=${levelData.pnid}&uploaded=${encodeURIComponent(uploaded)}&updated=${encodeURIComponent(updated)}`;
+
+                        // Return the $.get() request as a promise
+                        return $.get(url);
+                    });
+
+                    // Ensure requests are completed in order
+                    Promise.all(requests).then(results => {
+                        results.forEach(html => {
+                            $(".cards").append(html);
+                            offset++;
+                        });
+                    });
+                    donotload = false;
+                }
+            });
+        }
+
+        loadCourses();
+
+        $(window).on("scroll", function () {
+            if (donotload) return
+            if ($(window).scrollTop() + $(window).height() >= $(document).height() - 100) {
+                donotload = true;
+                loadCourses();
+            }
+        });
+    });
+
+</script>
+<%- include('../partials/footer'); %>
+</body>
+</html>

@@ -1,0 +1,141 @@
+
+@font-face {
+    font-family: 'SMMFont';
+    src: url('smm.woff') format('woff');
+}
+* {
+    color: rgb(0, 0, 0);
+    font-family: 'SMMFont', sans-serif;
+}
+body {
+    color: rgb(0, 0, 0);
+    background: rgb(255, 248, 175);
+    text-align: center;
+    padding-top: 1em;
+}
+.footer {
+    position: fixed;
+    bottom: 0;
+    width: 100%;
+}
+.cards {
+    flex-direction: column;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+.fullcard {
+    display: inline-block;
+    background: rgb(248, 202, 0);
+    padding: 1em;
+    border-radius: 1em;
+    width: 60%;
+    margin: 20px 0px;
+    border-radius: 6px;
+    border: 4px solid rgb(248, 202, 0);
+    box-shadow: black 0px 0px 0px 4px;
+}
+.fullcard_cont {
+    display: inline-block;
+    width: 40%;
+
+}
+.fullcard_cont img {
+     max-width: 100%;
+     height: auto;  /* Maintain aspect ratio */
+     object-fit: cover; /* or 'contain' depending on desired behavior */
+ }
+
+.card {
+    display: inline-block;
+    background: rgb(248, 202, 0);
+    padding: 1em;
+    border-radius: 1em;
+    width: 25%;
+    margin: 20px 0px;
+    border-radius: 6px;
+    border: 4px solid rgb(248, 202, 0);
+    box-shadow: black 0px 0px 0px 4px;
+}
+.card img {
+    max-width: 100%;
+    height: auto;  /* Maintain aspect ratio */
+    object-fit: cover; /* or 'contain' depending on desired behavior */
+}
+.card .thumb {
+    max-width: 100%;
+}
+.card .preview {
+    max-height: 100%;
+}
+@media only screen and (max-width: 768px) {
+    .cards {
+        max-width: 90%;
+    }
+}
+
+iframe {
+    width: fit-content;
+    height: fit-content;
+}
+
+div#nav{
+    overflow: hidden;
+    display: flex;
+    justify-content: center;
+}
+
+.footer {
+    opacity: 0.8; /* Makes the footer 50% opaque */
+    background-color: rgb(255, 248, 175); /* Optional, for a background with opacity */
+    padding: 10px; /* Padding for spacing */
+    text-align: center; /* Center text */
+}
+
+
+
+select option {
+    color: red; /* Ensures all options appear red by default */
+}
+
+select option:checked {
+    color: green; /* Changes the text color of the selected option */
+    background-color: white;
+}
+label, select {
+    display: inline-block;
+    margin-right: 10px; /* Space between label and select */
+}
+
+
+.user-card {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px;
+    border-radius: 8px;
+    white-space: nowrap;
+}
+
+.user-pfp {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    object-fit: cover;
+}
+
+.user-info {
+    display: flex;
+    flex-direction: column;
+}
+
+.user-name {
+    font-weight: bold;
+}
+button{
+    background: rgb(248, 202, 0);
+}
+.user-detail {
+    font-size: 14px;
+    color: gray;
+}

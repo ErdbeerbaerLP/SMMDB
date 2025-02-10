@@ -1,0 +1,7 @@
+asgiref
+pycryptodomex
+anynet
+setuptools
+mariadb
+numpy
+anyio

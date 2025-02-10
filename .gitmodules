@@ -1,0 +1,3 @@
+[submodule "PretendoClients"]
+	path = PretendoClients
+	url = https://github.com/Milk-Cool/PretendoClients.git

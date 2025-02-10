@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <%- include('../partials/head'); %>
+    <title><%= levelname %> by <%= owner_name %> - Super Mario Maker Database</title>
+    <meta property="og:title" content="<%= levelname %> by <%= owner_name %> - Super Mario Maker Database"/>
+    <meta property="og:type" content="website"/>
+    <meta property="og:url" content="http://smm.pretendo.zip"/>
+    <meta property="og:image" content="https://smm.pretendo.zip/course/<%= pid %>/thumb"/>
+    <meta property="og:description" content="<%= levelid %> - <%= stars %> 🌟"/>
+    <meta name="theme-color" content="#ecce07">
+
+    <!-- Include this to make the og:image larger -->
+    <meta name="twitter:card" content="summary_large_image">
+</head>
+<body>
+<%- include('../partials/header'); %>
+<h1>Course Details</h1>
+<div class="cards">
+    <div class="fullcard">
+        <div class="fullcard_cont">
+            <h2><%= levelname %></h2>
+            <h5><%= levelid %></h5>
+            <%- include('../partials/user_profile', {pid: owner_id, name: owner_name, pnid: owner_pnid}); %>
+            <h4><%= stars %><span class="star">☆️</span></h4>
+            <img src="<%= thumbnail %>" alt="Level Thumbnail"><br><br>
+            <img src="<%= preview %>" alt="Level Preview"><br><br>
+
+
+            Uploaded: <span id="uploaded">Loading...</span><br>Last updated: <span id="lastupdated">Loading...</span>
+            <script>
+                $(document).ready(function () {
+
+
+                    var timestamp = <%= last_updated %> *
+                    1000;
+                    var updated = new Date(timestamp).toLocaleString();
+                    var timestamp2 = <%= creation %> *
+                    1000;
+                    var uploaded = new Date(timestamp2).toLocaleString();
+                    $("#lastupdated").text(updated);
+                    $("#uploaded").text(uploaded);
+
+
+                });
+            </script>
+        </div>
+        <div class="fullcard_cont">
+            <h4><b>Attempts:</b> Unknown</h4>
+            <h4><b>Clears:</b> Unknown</h4>
+            <h4><b>Time Limit:</b> <%= timelimit %></h4><br>
+            <h4><b>Autoscrolling🏞️️:</b> <%= autoscroll_text %></h4>
+            <h4><b>Autoscrolling🕳:</b> <%= subautoscroll_text %></h4><br>
+            <h4><b>Gamestyle:</b> <%= gamestyle_text %></h4><br>
+            <h4><b>Overworld Theme:</b> <%= theme_text %></h4>
+            <h4><b>Subworld Theme:</b> <%= subtheme_text %></h4><br>
+            <h4><b>Overworld Objects:</b> <%= objcount %></h4>
+            <h4><b>Subworld Objects:</b> <%= subobjcount %></h4><br>
+            <h4><b>First Clear:</b>
+                <% if(first_clear_pid !== null){ %>
+                    <%- include('../partials/user_profile', {pid: first_clear_pid, name: first_clear_name, pnid: first_clear_pnid}); %>
+                <% } else{ %>
+                    <% if(last_updated >= 1738979129){ %>
+                        None
+                    <% } else{ %>
+                        Not indexed
+                    <% } %>
+                <% } %>
+            </h4>
+            <h4><b>World Record</b>
+                <% if(best_clear_pid !== null){ %>
+                    (<span id="score">??m??s???</span>):
+                    <%- include('../partials/user_profile', {pid: best_clear_pid, name: best_clear_name, pnid: best_clear_pnid}); %>
+                    <script>
+                        $(document).ready(function () {
+                            var score = <%= best_clear_score %>;
+
+                            let trimmedNumber = Math.floor(score / 1000);
+                            let remainingDigits = score % 1000;
+
+                            let formattedScore;
+
+                            if (trimmedNumber < 60) {
+                                formattedScore = `${trimmedNumber}s${remainingDigits}`;
+                            } else {
+                                let minutes = Math.floor(trimmedNumber / 60);
+                                let seconds = trimmedNumber % 60;
+                                formattedScore = `${minutes}m${seconds}s${remainingDigits}`;
+                            }
+
+                            $("#score").text(formattedScore);
+
+                        });
+                    </script>
+                <% } else{ %>
+                    :  <% if(last_updated >= 1738979129){ %>
+                        None
+                    <% } else{ %>
+                        Not indexed
+                    <% } %>
+                <% } %>
+            </h4>
+
+        </div>
+        <br>
+        <a href="/course/<%= pid %>/download">
+            <button class="downloadbtn">Download</button>
+        </a>
+    </div>
+</div>
+<br>
+<%- include('../partials/footer'); %>
+</body>
+</html>

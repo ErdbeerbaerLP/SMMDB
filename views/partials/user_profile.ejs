@@ -1,0 +1,12 @@
+<% if (typeof clickable === "undefined" || clickable !== false) { %><a href="/user/<%= pid %>">
+    <% } %>
+
+    <div class="user-card">
+        <img src="https://r2-cdn.pretendo.cc/mii/<%= pid %>/normal_face.png" alt="User Mii" class="user-pfp">
+        <div class="user-info">
+            <div class="user-name"><%= name %></div>
+            <div class="user-detail">@<%= pnid %></div>
+        </div>
+    </div>
+    <% if (typeof clickable === "undefined" || clickable !== false) { %>
+</a><% } %><br>
