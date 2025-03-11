@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <%- include('../partials/head'); %>
+    <title>100 Mario Challenge - Super Mario Maker Database</title>
+    <meta property="og:title" content="100 Mario Challenge - Super Mario Maker Database"/>
+    <meta property="og:type" content="website"/>
+    <meta property="og:url" content="https://smm.pretendo.zip"/>
+    <meta property="og:description" content="A browser recreation of the 100 mario challenge"/>
+    <meta name="theme-color" content="#ecce07">
+
+    <!-- Include this to make the og:image larger -->
+    <meta name="twitter:card" content="summary_large_image">
+</head>
+<body>
+<%- include('../partials/header'); %>
+<h2>100 Mario Challenge &nbsp;&nbsp;&nbsp;<!--button disabled>⚙</button-->
+</h2>
+<br>
+<h3><span id="lives">100</span>x<img src="mario.png" width="32" height="32" alt="Mario"/> - <span id="clears">0</span> /
+    <span id="required">16</span></h3>
+<div class="cards">
+    <div class="fullcard">
+        <h1 id="level-name">Level 123 456</h1>
+        <h2 id="level-id">1234-5678-9012-3456</h2>
+        Enter the Course ID on your Wii U console and use the buttons below accordingly<br>
+        <img id="level-thumb" src="https://placehold.co/400x200" alt="Level Thumbnail"><br>
+        <h4><b>First Clear:</b> <span id="firstclear"></span></h4>
+        <br><br>
+        <button id="skip">Skip</button> &nbsp;
+        <button id="lost">Lost a live</button> &nbsp;
+        <button id="clear">Cleared!</button> &nbsp;
+        <button id="1up">+ 1-Up</button>
+        <br><br>
+        <button id="reset">Start Over!</button>
+    </div>
+    <br>
+    Your state will be saved in a browser cookie.
+    <br><br><br>
+</div>
+<script>
+
+
+    let currentCourse = [];
+
+    // Helper Methods
+    function setCookie(name, value, days = 7) {
+        let d = new Date();
+        d.setTime(d.getTime() + (days * 24 * 60 * 60 * 1000)); // expires after 'days' days
+        let expires = "expires=" + d.toUTCString();
+        document.cookie = `${name}=${value}; ${expires}; path=/`;
+    }
+
+    function getCookie(name) {
+        let nameEQ = name + "=";
+        let ca = document.cookie.split(';');
+        for (let i = 0; i < ca.length; i++) {
+            let c = ca[i].trim();
+            if (c.indexOf(nameEQ) === 0) return c.substring(nameEQ.length, c.length);
+        }
+        return null; // Cookie not found
+    }
+
+    function containsCookie(name) {
+        return getCookie(name) !== null;
+    }
+
+    function deleteCookie(name) {
+        document.cookie = name + "=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/";
+    }
+
+    function getRandomCourse() {
+        let difficulty = getCookie("settings.difficulty")
+        return new Promise((resolve, reject) => {
+            $.getJSON(`/api/course/search/0?sort=random&limit=1&hasFirstClear=` + (difficulty === 2 ? "false" : "true"))
+                .done(function (data) {
+                    data[0].thumb = "/course/" + data[0].levelid + "/thumb"
+                    data[0].preview = "/course/" + data[0].levelid + "/thumb"
+                    resolve(data[0]);
+                })
+                .fail(function (error) {
+                    reject(error);
+                });
+        });
+    }
+
+    function getCourse(pid) {
+        return new Promise((resolve, reject) => {
+            $.getJSON(`/api/course/` + pid)
+                .done(function (data) {
+                    resolve(data);
+                })
+                .fail(function (error) {
+                    reject(error);
+                });
+        });
+    }
+
+    function reset() {
+        setCookie("lives", 100)
+        setCookie("skips", 0)
+        setCookie("clears", 0)
+        setCookie("available-1ups", 0)
+        setCookie("current-level-pid", 0)
+    }
+
+    function render() {
+        $("#lives").text(getCookie("lives"));
+        $("#level-name").text(currentCourse.name);
+        $("#level-id").text(currentCourse.levelcode);
+        $("#clears").text(getCookie("clears"));
+        $("#level-thumb").attr("src", currentCourse.thumb);
+
+        if (currentCourse.first_clear_pid !== undefined && currentCourse.first_clear_pid !== null) {
+            const url = `/partial/user?pid=${currentCourse.first_clear_pid}&name=${encodeURIComponent(currentCourse.first_clear_name)}&pnid=${currentCourse.first_clear_pnid}`;
+            $.get(url).done(function (data) {
+                $("#firstclear").text("");
+                $("#firstclear").append(data);
+            });
+        } else {
+            $("#firstclear").text("");
+            $("#firstclear").append("None");
+        }
+
+    }
+
+    // Initialize cookies, if not already done
+    if (!containsCookie("lives")) {
+        setCookie("lives", 100)
+    }
+    if (!containsCookie("skips")) {
+        setCookie("skips", 0)
+    }
+    if (!containsCookie("clears")) {
+        setCookie("clears", 0)
+    }
+    if (!containsCookie("available-1ups")) {
+        setCookie("available-1ups", 0)
+    }
+    if (!containsCookie("settings.difficulty")) {
+        setCookie("settings.difficulty", 1)
+    }
+    if (!containsCookie("current-level-pid")) {
+        setCookie("current-level-pid", 0)
+    }
+    (async () => {
+        if (parseInt(getCookie("current-level-pid")) === 0)
+            currentCourse = await getRandomCourse()
+        else
+            currentCourse = await getCourse(getCookie("current-level-pid"))
+        setCookie("current-level-pid", currentCourse.levelid)
+        render();
+    })();
+    $('#skip').click(async function () {
+        const userResponse = window.confirm("Do you want to skip?");
+        if (userResponse) {
+            setCookie("skips", parseInt(getCookie("skips")) + 1)
+            currentCourse = await getRandomCourse()
+            setCookie("current-level-pid", currentCourse.levelid)
+            render()
+        }
+    });
+    $('#1up').click(async function () {
+        if (getCookie("available-1ups") <= 0) {
+            alert("You can only collect up to 3 1-UPs per clear!")
+        } else if (getCookie("lives") >= 100) {
+            alert("You can only have up to 100 lives!")
+        } else {
+            setCookie("available-1ups", parseInt(getCookie("available-1ups")) - 1)
+            setCookie("lives", parseInt(getCookie("lives")) + 1)
+
+            render()
+        }
+
+    });
+    $('#lost').click(async function () {
+        if (getCookie("lives") <= 1) {
+            alert("Game Over! You cleared " + getCookie("clears") + " levels and skipped " + getCookie("skips") + " times\nThe game will start over!")
+            reset()
+            currentCourse = await getRandomCourse()
+            setCookie("current-level-pid", currentCourse.levelid)
+        } else
+            setCookie("lives", getCookie("lives") - 1);
+        render()
+    });
+    $('#clear').click(async function () {
+        if (getCookie("clears") >= 16) {
+
+            alert("Thank you, Mario. But our princess is in another castle!\n\nYou cleared " + getCookie("clears") + " levels and skipped " + getCookie("skips") + " times\nThe game will start over!")
+            reset()
+            currentCourse = await getRandomCourse()
+            setCookie("current-level-pid", currentCourse.levelid)
+        } else {
+            setCookie("clears", parseInt(getCookie("clears")) + 1);
+            currentCourse = await getRandomCourse()
+            setCookie("current-level-pid", currentCourse.levelid)
+            setCookie("available-1ups", 3)
+        }
+        render()
+    });
+    $('#reset').click(async function () {
+        const userResponse = window.confirm("Do you want to start over? This cannot be undone.")
+        if (userResponse) {
+            reset()
+            currentCourse = await getRandomCourse()
+            setCookie("current-level-pid", currentCourse.levelid)
+            render()
+        }
+    });
+
+</script>
+<br>
+<%- include('../partials/footer'); %>
+</body>
+</html>

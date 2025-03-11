@@ -20,6 +20,8 @@
 <div class="cards">
 
 </div>
+<br>
+<button id="loadMore">Load more...</button><br><br><br><br><br>
 <script>
     let offset = 0;
     let initial = true;
@@ -71,6 +73,12 @@
                 donotload = true;
                 loadCourses();
             }
+        });
+
+        $("#loadMore").on("click", function () {
+            if (donotload) return
+            donotload = true;
+            loadCourses();
         });
     });
 

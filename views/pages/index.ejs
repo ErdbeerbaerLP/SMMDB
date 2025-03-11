@@ -7,7 +7,7 @@
     <title>Super Mario Maker Database</title>
     <meta property="og:title" content="Super Mario Maker Database"/>
     <meta property="og:type" content="website"/>
-    <meta property="og:url" content="http://smm.pretendo.zip"/>
+    <meta property="og:url" content="https://smm.pretendo.zip"/>
     <meta property="og:description" content="Search thru the mario maker levels on Pretendo Network"/>
     <meta name="theme-color" content="#ecce07">
 </head>
@@ -18,6 +18,8 @@
 <div class="cards">
 
 </div>
+<br>
+<button id="loadMore">Load more...</button><br><br><br><br><br>
 <script>
     let offset = 0;
     let initial = true;
@@ -69,6 +71,12 @@
                 donotload = true;
                 loadCourses();
             }
+        });
+
+        $("#loadMore").on("click", function () {
+            if (donotload) return
+            donotload = true;
+            loadCourses();
         });
     });
 

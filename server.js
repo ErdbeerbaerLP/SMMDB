@@ -20,23 +20,30 @@ if(typeof SMMDB_DBIP !== undefined && SMMDB_DBIP !== null){
     process.exit(1);
 }
 const app = express();
-
-const genericRateLimit = rateLimit({
-    windowMs: 10 * 60 * 1000, // 10 minutes
-    limit: 100, // Limit each IP to 100 requests per `window` (here, per 15 minutes).
-    standardHeaders: 'draft-8', // draft-6: `RateLimit-*` headers; draft-7 & draft-8: combined `RateLimit` header
-    legacyHeaders: false, // Disable the `X-RateLimit-*` headers.
-    validate: {xForwardedForHeader: false}
-    // store: ... , // Redis, Memcached, etc. See below.
-})
-app.use(genericRateLimit)
+app.set('trust proxy', 1 /* number of proxies between user and server */)
 const downloadLimit = rateLimit({
     windowMs: 5 * 60 * 1000,
-    limit: 2,
+    limit: 5,
     standardHeaders: 'draft-8',
     legacyHeaders: false,
-    message: "Please do not download too many files at once! Limited to 2 files per 5 minutes",
-    validate: {xForwardedForHeader: false}
+    message: "Please do not download too many files at once! Limited to 5 files per 5 minutes",
+    validate: {xForwardedForHeader: true}
+})
+const courseRequestLimit = rateLimit({
+    windowMs: 5 * 60 * 1000,
+    limit: 5000,
+    standardHeaders: 'draft-8',
+    legacyHeaders: false,
+    message: "Please do not spam the API :<",
+    validate: {xForwardedForHeader: true}
+})
+const courseThumbRequestLimit = rateLimit({
+    windowMs: 5 * 60 * 1000,
+    limit: 5000*3,
+    standardHeaders: 'draft-8',
+    legacyHeaders: false,
+    message: "Please do not spam the API :<",
+    validate: {xForwardedForHeader: true}
 })
 
 const pool = mariadb.createPool({
@@ -54,15 +61,15 @@ BigInt.prototype['toJSON'] = function () {
 //py.call(pymodule, "main", ...argsWiiU);
 
 function patchImages(rowIn) {
-    if (rowIn.thumb != undefined)
+    if (rowIn.thumb !== undefined)
         rowIn.thumb = "data:image/jpeg;base64," + rowIn.thumb.toString('base64')
-    if (rowIn.preview != undefined)
+    if (rowIn.preview !== undefined)
         rowIn.preview = "data:image/jpeg;base64," + rowIn.preview.toString('base64')
 }
 
 app.set('view engine', 'ejs');
 
-app.get("/api/course/search/:offset", (req, res) => {
+app.get("/api/course/search/:offset", courseRequestLimit, (req, res) => {
     const {offset} = req.params;
     const {
         query,
@@ -79,7 +86,8 @@ app.get("/api/course/search/:offset", (req, res) => {
         maxobj,
         hasSubworld,
         sort,
-        hasFirstClear
+        hasFirstClear,
+        limit
     } = req.query;
     let sorting = "";
     switch (sort) {
@@ -198,6 +206,11 @@ app.get("/api/course/search/:offset", (req, res) => {
             where += "l.`first_clear_pid` IS NULL"
     }
 
+    let lim = 25
+    if(limit){
+        lim = parseInt(limit)
+    }
+
     console.log(vars)
     if (where !== "") where = "WHERE " + where;
 
@@ -205,14 +218,22 @@ app.get("/api/course/search/:offset", (req, res) => {
         .then(conn => {
             let query = "SELECT l.`levelid`, l.`levelcode`, l.`name`, l.`creation`, l.`ownerid`, " +
                 "l.`autoscroll`, l.`theme`, l.`subtheme`, l.`gamestyle`, l.`objcount`, " +
-                "l.`subobjcount`, l.`timelimit`, l.`stars`, l.`first_clear_pid`, l.`attempts`, " +
+                "l.`subobjcount`, l.`timelimit`, l.`stars`, l.`attempts`, " +
                 "l.`clears`, l.`last_updated`, " +
-                "u.`pnid`, u.`name` AS `owner_name` " +
+                "u.`pnid`, u.`name` AS `owner_name`, " +
+                "    fc.`pid` AS `first_clear_pid`, \n" +
+                "    fc.`pnid` AS `first_clear_pnid`, \n" +
+                "    fc.`name` AS `first_clear_name`, \n" +
+                "    bc.`pid` AS `best_clear_pid`, \n" +
+                "    bc.`pnid` AS `best_clear_pnid`, \n" +
+                "    bc.`name` AS `best_clear_name`\n" +
                 "FROM `levels` l " +
                 "JOIN `users` u ON l.`ownerid` = u.`pid` " +
+                "LEFT JOIN `users` fc ON l.`first_clear_pid` = fc.`pid`\n" +
+                "LEFT JOIN `users` bc ON l.`best_clear_pid` = bc.`pid`\n" +
                 where + " " +
                 sorting + " " +
-                "LIMIT 25 OFFSET ? ";
+                "LIMIT "+lim+" OFFSET ? ";
             console.log(query)
             conn.query(query, [...vars, parseInt(offset)]).then((rows) => {
                 res.status(200).end(JSON.stringify(rows));
@@ -229,11 +250,25 @@ app.get("/api/course/search/:offset", (req, res) => {
         return res.status(500).end("database down");
     });
 })
-app.get("/api/course/:pid", (req, res) => {
+app.get("/api/course/:pid", courseRequestLimit, (req, res) => {
     const {pid} = req.params;
     pool.getConnection()
         .then(conn => {
-            conn.query("SELECT `levelid`, `levelcode`, `name`, `creation`, `ownerid`, `autoscroll`, `theme`, `subtheme`, `gamestyle`, `objcount`, `subobjcount`, `timelimit`, `stars`, `first_clear_pid`,`first_clear_time`,`best_clear_pid`,`best_clear_time`,`best_clear_score`, `attempts`, `clears`, `thumb`, `preview`, `last_updated` FROM `levels` WHERE `levelid` = ?", pid)
+            conn.query("SELECT `levelid`, `levelcode`, l.`name`, `creation`, `ownerid`, `autoscroll`, `theme`, `subtheme`, `gamestyle`, `objcount`, `subobjcount`, `timelimit`, `stars`, `first_clear_time`,`best_clear_time`,`best_clear_score`," +
+                " `attempts`, `clears`, `thumb`, `preview`, `last_updated`," +
+
+                "u.`pnid`, u.`name` AS `owner_name`, " +
+                "    fc.`pid` AS `first_clear_pid`, \n" +
+                "    fc.`pnid` AS `first_clear_pnid`, \n" +
+                "    fc.`name` AS `first_clear_name`, \n" +
+                "    bc.`pid` AS `best_clear_pid`, \n" +
+                "    bc.`pnid` AS `best_clear_pnid`, \n" +
+                "    bc.`name` AS `best_clear_name`\n" +
+                " FROM `levels` l " +
+                "JOIN `users` u ON l.`ownerid` = u.`pid` " +
+                "LEFT JOIN `users` fc ON l.`first_clear_pid` = fc.`pid`\n" +
+                "LEFT JOIN `users` bc ON l.`best_clear_pid` = bc.`pid`\n" +
+                " WHERE `levelid` = ?", pid)
                 .then((rows) => {
                     let row = rows[0]
                     console.log(row)
@@ -270,7 +305,7 @@ app.get("/api/stats", (req, res) => {
 });
 
 
-app.get("/course/random", (req, res) => {
+app.get("/course/random", courseRequestLimit, (req, res) => {
     pool.getConnection()
         .then(conn => {
             conn.query("SELECT levelid FROM levels ORDER BY RAND() LIMIT 1;")
@@ -300,8 +335,15 @@ app.post('/course/search', function (req, res) {
     res.render('pages/searchresults', req.body);
     res.status(200).end(JSON.stringify());
 })
-app.get("/course/:pid", (req, res) => {
-    const {pid} = req.params;
+app.get("/course/:pid", courseRequestLimit, (req, res) => {
+    let {pid} = req.params;
+    if(pid.match(/(?:[\da-fA-F]{4}-){3}[\da-fA-F]{4}/)){
+        const cleanedHex = pid.replace(/^[\da-fA-F]{4}-|-/g, "");
+
+        // Convert the resulting cleaned hex string to a decimal number
+        pid = parseInt(cleanedHex, 16);
+
+    }
     pool.getConnection()
         .then(conn => {
             conn.query(
@@ -343,6 +385,11 @@ app.get("/course/:pid", (req, res) => {
             )
                 .then((rows) => {
                     let row = rows[0]
+                    if(row === undefined){
+                        res.status(404).render("pages/course_404");
+                        return;
+                    }
+                    console.log(row)
                     patchImages(row)
                     const theme = {
                         0: "Overworld",
@@ -408,7 +455,7 @@ app.get("/course/:pid", (req, res) => {
         return res.status(500).end("database down");
     });
 })
-app.get("/course/:pid/thumb", (req, res) => {
+app.get("/course/:pid/thumb", courseThumbRequestLimit, (req, res) => {
     const {pid} = req.params;
     pool.getConnection()
         .then(conn => {
@@ -464,7 +511,7 @@ app.get("/course/:pid/download", downloadLimit, (req, res) => {
         return res.status(500).end("database down");
     });
 })
-app.get("/course/:pid/preview", (req, res) => {
+app.get("/course/:pid/preview", courseThumbRequestLimit, (req, res) => {
     const {pid} = req.params;
     pool.getConnection()
         .then(conn => {
@@ -497,8 +544,12 @@ app.get('/top', function (req, res) {
 app.get('/new', function (req, res) {
     res.render('pages/new');
 })
+app.get('/100mario', function (req, res) {
+    res.render('pages/100mario');
+})
 
-app.get('/user/:pid', function (req, res) {
+
+app.get('/user/:pid',courseRequestLimit, function (req, res) {
     const {pid} = req.params;
     pool.getConnection()
         .then(conn => {
@@ -527,6 +578,26 @@ app.get('/user/:pid', function (req, res) {
 app.get('/partial/course', (req, res) => {
     res.render('partials/course_card', req.query);
 });
+app.get('/partial/user', (req, res) => {
+    res.render('partials/user_profile', req.query);
+});
 
 app.use(express.static("html/"));
 app.listen(process.env.PORT ?? 8764);
+app.use(function(req, res, next) {
+    res.status(404);
+
+    // respond with html page
+    if (req.accepts('html')) {
+        res.render('pages/generic_404', { url: req.url });
+        return;
+    }
+
+    // respond with json
+    if (req.accepts('json')) {
+        res.json({ error: 'Not found' });
+        return;
+    }
+
+    res.type('txt').send('Not found');
+});

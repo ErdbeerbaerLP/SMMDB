@@ -4,10 +4,10 @@
     <%- include('../partials/head'); %>
 
     <title>Top Levels - Super Mario Maker Database</title>
-    <meta property="og:title" content="Top Levels - Super Mario Maker Database"/>
+    <meta property="og:title" content="New Levels - Super Mario Maker Database"/>
     <meta property="og:type" content="website"/>
     <meta property="og:url" content="https://smm.pretendo.zip"/>
-    <meta property="og:description" content="View the top Mario Maker levels from Pretendo Network"/>
+    <meta property="og:description" content="View the newest Mario Maker levels from Pretendo Network"/>
     <meta name="theme-color" content="#ecce07">
 
 </head>
@@ -17,6 +17,8 @@
 <div class="cards">
 
 </div>
+<br>
+<button id="loadMore">Load more...</button><br><br><br><br><br>
 <script>
     let offset = 0;
     let initial = true;
@@ -69,6 +71,12 @@
                 loadCourses();
             }
         });
+        $("#loadMore").on("click", function () {
+            if (donotload) return
+            donotload = true;
+            loadCourses();
+        });
+
     });
 
 </script>
