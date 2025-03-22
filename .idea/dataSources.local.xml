@@ -2,7 +2,7 @@
 <project version="4">
   <component name="dataSourceStorageLocal" created-in="IU-243.23654.189">
     <data-source name="ErdbeerbaerLP" uuid="dd0fcbb6-c9d5-4c8e-9edb-713640e2946d">
-      <database-info product="MariaDB" version="11.4.4-MariaDB-ubu2204" jdbc-version="4.2" driver-name="MariaDB Connector/J" driver-version="3.3.3" dbms="MARIADB" exact-version="11.4.4" exact-driver-version="3.3">
+      <database-info product="MariaDB" version="11.4.5-MariaDB-ubu2204" jdbc-version="4.2" driver-name="MariaDB Connector/J" driver-version="3.3.3" dbms="MARIADB" exact-version="11.4.5" exact-driver-version="3.3">
         <extra-name-characters>#@</extra-name-characters>
         <identifier-quote-string>`</identifier-quote-string>
       </database-info>
