@@ -1,6 +1,7 @@
 import express from "express";
 import mariadb from "mariadb";
 import crc_32 from "crc-32";
+import git from "git-rev-sync";
 import Zip from "node-zip";
 import {rateLimit} from 'express-rate-limit'
 
@@ -312,6 +313,9 @@ app.get("/api/stats", (req, res) => {
         pool.end();
         return res.status(500).end("database down");
     });
+});
+app.get("/api/curcommit", (req, res) => {
+    res.send({hash: git.short("."), remote: git.remoteUrl(".")})
 });
 
 
