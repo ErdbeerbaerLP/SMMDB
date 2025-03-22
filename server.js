@@ -1,5 +1,6 @@
 import express from "express";
 import mariadb from "mariadb";
+import crc_32 from "crc-32";
 import Zip from "node-zip";
 import {rateLimit} from 'express-rate-limit'
 
@@ -7,26 +8,34 @@ let {
     SMMDB_DBUSER = "smmdb",
     SMMDB_DBPASSWORD,
     SMMDB_DBIP,
-    SMMDB_DBPORT= 3306,
-    SMMDB_DBNAME= "smmdb",
+    SMMDB_DBPORT = 3306,
+    SMMDB_DBNAME = "smmdb",
 } = process.env;
 SMMDB_DBPORT = parseInt(SMMDB_DBPORT)
 
 
 // Only checking one env variable
-if(typeof SMMDB_DBIP !== undefined && SMMDB_DBIP !== null){
-}else{
+if (typeof SMMDB_DBIP !== undefined && SMMDB_DBIP !== null) {
+} else {
     console.error("No environment variables defined!")
     process.exit(1);
 }
+
+
+const sanitize = (input) => {
+    // Basic sanitization: remove unsafe characters
+    return input.replace(/[^a-z0-9_\-\. ]/gi, '').trim();
+};
+
+
 const app = express();
 app.set('trust proxy', 1 /* number of proxies between user and server */)
 const downloadLimit = rateLimit({
     windowMs: 5 * 60 * 1000,
-    limit: 5,
+    limit: 15,
     standardHeaders: 'draft-8',
     legacyHeaders: false,
-    message: "Please do not download too many files at once! Limited to 5 files per 5 minutes",
+    message: "Please do not download too many files at once! Limited to 15 files per 5 minutes",
     validate: {xForwardedForHeader: true}
 })
 const courseRequestLimit = rateLimit({
@@ -39,7 +48,7 @@ const courseRequestLimit = rateLimit({
 })
 const courseThumbRequestLimit = rateLimit({
     windowMs: 5 * 60 * 1000,
-    limit: 5000*3,
+    limit: 5000 * 3,
     standardHeaders: 'draft-8',
     legacyHeaders: false,
     message: "Please do not spam the API :<",
@@ -207,7 +216,7 @@ app.get("/api/course/search/:offset", courseRequestLimit, (req, res) => {
     }
 
     let lim = 25
-    if(limit){
+    if (limit) {
         lim = parseInt(limit)
     }
 
@@ -233,7 +242,7 @@ app.get("/api/course/search/:offset", courseRequestLimit, (req, res) => {
                 "LEFT JOIN `users` bc ON l.`best_clear_pid` = bc.`pid`\n" +
                 where + " " +
                 sorting + " " +
-                "LIMIT "+lim+" OFFSET ? ";
+                "LIMIT " + lim + " OFFSET ? ";
             console.log(query)
             conn.query(query, [...vars, parseInt(offset)]).then((rows) => {
                 res.status(200).end(JSON.stringify(rows));
@@ -285,6 +294,7 @@ app.get("/api/course/:pid", courseRequestLimit, (req, res) => {
         return res.status(500).end("database down");
     });
 });
+
 app.get("/api/stats", (req, res) => {
     pool.getConnection()
         .then(conn => {
@@ -311,7 +321,7 @@ app.get("/course/random", courseRequestLimit, (req, res) => {
             conn.query("SELECT levelid FROM levels ORDER BY RAND() LIMIT 1;")
                 .then((rows) => {
                     console.log("Selecting course " + rows[0].levelid)
-                    res.status(301).location("/course/" + rows[0].levelid).end();
+                    res.status(301).set("Cache-Control", "no-store").location("/course/" + rows[0].levelid).end();
                     conn.end();
                 }).catch(err => {
                 console.log(err);
@@ -320,7 +330,6 @@ app.get("/course/random", courseRequestLimit, (req, res) => {
             })
 
         }).catch(err => {
-
         pool.end();
         return res.status(500).end("database down");
     });
@@ -337,7 +346,7 @@ app.post('/course/search', function (req, res) {
 })
 app.get("/course/:pid", courseRequestLimit, (req, res) => {
     let {pid} = req.params;
-    if(pid.match(/(?:[\da-fA-F]{4}-){3}[\da-fA-F]{4}/)){
+    if (pid.match(/(?:[\da-fA-F]{4}-){3}[\da-fA-F]{4}/)) {
         const cleanedHex = pid.replace(/^[\da-fA-F]{4}-|-/g, "");
 
         // Convert the resulting cleaned hex string to a decimal number
@@ -385,7 +394,7 @@ app.get("/course/:pid", courseRequestLimit, (req, res) => {
             )
                 .then((rows) => {
                     let row = rows[0]
-                    if(row === undefined){
+                    if (row === undefined) {
                         res.status(404).render("pages/course_404");
                         return;
                     }
@@ -465,6 +474,10 @@ app.get("/course/:pid/thumb", courseThumbRequestLimit, (req, res) => {
             )
                 .then((rows) => {
                     let row = rows[0]
+                    if (row === undefined) {
+                        res.status(404);
+                        return;
+                    }
                     res.set("Content-Type", "image/jpeg");
                     res.send(row.thumb)
                     conn.end();
@@ -483,18 +496,68 @@ app.get("/course/:pid/download", downloadLimit, (req, res) => {
     pool.getConnection()
         .then(conn => {
             conn.query(
-                "SELECT `overworld`, `subworld` FROM `levels` WHERE `levelid` = ?",
+                "SELECT `overworld`, `subworld`, `thumb`, `preview`, `ownerid`, `name` FROM `levels` WHERE `levelid` = ?",
                 [pid]
             )
                 .then((rows) => {
                     let row = rows[0]
+                    if (row === undefined) {
+                        res.status(404).render("pages/course_404");
+                        return;
+                    }
                     let zip = new Zip;
                     if (row.overworld) {
 
                         zip.file("course_data.cdt", row.overworld)
                         zip.file("course_data_sub.cdt", row.subworld)
+
+                        function trimTrailingZeros(buffer) {
+                            let end = buffer.length;
+                            while (end > 0 && buffer[end - 1] === 0x00) {
+                                end--;
+                            }
+                            return buffer.slice(0, end);
+                        }
+
+                        function createFileContent(data) {
+                            if (!data) {
+                                throw new Error('Invalid data passed to createFileContent');
+                            }
+
+                            const buffer = Buffer.isBuffer(data) ? data : Buffer.from(data);
+
+                            // Only for length calculation (excluding trailing 0x00 bytes)
+                            const trimmedForLength = trimTrailingZeros(buffer);
+
+                            const length = trimmedForLength.length;
+
+                            // Prepare the length buffer (4 bytes big endian)
+                            const lengthBuffer = Buffer.alloc(4);
+                            lengthBuffer.writeUInt32BE(length, 0);
+
+                            // Combine length + full (untrimmed) data
+                            const lengthAndData = Buffer.concat([lengthBuffer, buffer]);
+
+                            // Calculate CRC32 over length + untrimmed data
+                            const crc = crc_32.buf(lengthAndData);
+
+                            // Prepare the CRC32 buffer (4 bytes big endian)
+                            const crcBuffer = Buffer.alloc(4);
+                            crcBuffer.writeUInt32BE(crc >>> 0, 0);
+
+                            // Final buffer: CRC + length + untrimmed data
+                            return Buffer.concat([crcBuffer, lengthAndData]);
+                        }
+
+// Add files to zip
+                        zip.file("thumbnail0.tnl", createFileContent(row.preview));
+                        zip.file("thumbnail1.tnl", createFileContent(row.thumb));
+
+
                         res.set("Content-Type", "application/zip")
-                        res.set('Content-disposition', 'attachment; filename=' + pid + '.zip');
+                        const name = sanitize(row.name);
+                        const filename = `[${pid}] ${name}.zip`;
+                        res.set('Content-Disposition', `attachment; filename="${filename}"`);
                         var options = {base64: false, type: "nodebuffer", compression: 'DEFLATE'};
                         res.send(zip.generate(options))
                     } else {
@@ -521,6 +584,10 @@ app.get("/course/:pid/preview", courseThumbRequestLimit, (req, res) => {
             )
                 .then((rows) => {
                     let row = rows[0]
+                    if (row === undefined) {
+                        res.status(404);
+                        return;
+                    }
                     res.set("Content-Type", "image/jpeg");
                     res.send(row.preview)
                     conn.end();
@@ -549,7 +616,7 @@ app.get('/100mario', function (req, res) {
 })
 
 
-app.get('/user/:pid',courseRequestLimit, function (req, res) {
+app.get('/user/:pid', courseRequestLimit, function (req, res) {
     const {pid} = req.params;
     pool.getConnection()
         .then(conn => {
@@ -559,6 +626,10 @@ app.get('/user/:pid',courseRequestLimit, function (req, res) {
             )
                 .then((rows) => {
                     let row = rows[0]
+                    if (row === undefined) {
+                        res.status(404).render("pages/user_404");
+                        return;
+                    }
                     res.render('pages/user', {
                         pid: row.pid,
                         name: row.name,
@@ -584,18 +655,18 @@ app.get('/partial/user', (req, res) => {
 
 app.use(express.static("html/"));
 app.listen(process.env.PORT ?? 8764);
-app.use(function(req, res, next) {
+app.use(function (req, res, next) {
     res.status(404);
 
     // respond with html page
     if (req.accepts('html')) {
-        res.render('pages/generic_404', { url: req.url });
+        res.render('pages/generic_404', {url: req.url});
         return;
     }
 
     // respond with json
     if (req.accepts('json')) {
-        res.json({ error: 'Not found' });
+        res.json({error: 'Not found'});
         return;
     }
 
