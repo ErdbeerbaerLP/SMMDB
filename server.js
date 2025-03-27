@@ -56,14 +56,19 @@ const courseThumbRequestLimit = rateLimit({
     validate: {xForwardedForHeader: true}
 })
 
-const pool = mariadb.createPool({
-    host: SMMDB_DBIP,
-    user: SMMDB_DBUSER,
-    password: SMMDB_DBPASSWORD,
-    port: SMMDB_DBPORT,
-    database: SMMDB_DBNAME,
-    connectionLimit: 15
-});
+let pool = createPool();
+
+function createPool() {
+    return mariadb.createPool({
+        host: SMMDB_DBIP,
+        user: SMMDB_DBUSER,
+        password: SMMDB_DBPASSWORD,
+        port: SMMDB_DBPORT,
+        database: SMMDB_DBNAME,
+        connectionLimit: 15
+    });
+}
+
 BigInt.prototype['toJSON'] = function () {
     return parseInt(this.toString());
 };
@@ -256,7 +261,9 @@ app.get("/api/course/search/:offset", courseRequestLimit, (req, res) => {
 
         }).catch(err => {
         console.log(err);
+        console.log('Reconnecting to DB...');
         pool.end();
+        pool = createPool();
         return res.status(500).end("database down");
     });
 })
@@ -291,7 +298,9 @@ app.get("/api/course/:pid", courseRequestLimit, (req, res) => {
                 return res.status(500).end("request error");
             })
         }).catch(err => {
+        console.log('Reconnecting to DB...');
         pool.end();
+        pool = createPool();
         return res.status(500).end("database down");
     });
 });
@@ -310,7 +319,9 @@ app.get("/api/stats", (req, res) => {
                 return res.status(500).end("request error");
             })
         }).catch(err => {
+        console.log('Reconnecting to DB...');
         pool.end();
+        pool = createPool();
         return res.status(500).end("database down");
     });
 });
@@ -334,7 +345,9 @@ app.get("/course/random", courseRequestLimit, (req, res) => {
             })
 
         }).catch(err => {
+        console.log('Reconnecting to DB...');
         pool.end();
+        pool = createPool();
         return res.status(500).end("database down");
     });
 })
@@ -464,7 +477,9 @@ app.get("/course/:pid", courseRequestLimit, (req, res) => {
                 return res.status(500).end("request error");
             })
         }).catch(err => {
+        console.log('Reconnecting to DB...');
         pool.end();
+        pool = createPool();
         return res.status(500).end("database down");
     });
 })
@@ -491,7 +506,9 @@ app.get("/course/:pid/thumb", courseThumbRequestLimit, (req, res) => {
                 return res.status(500).end("request error");
             })
         }).catch(err => {
+        console.log('Reconnecting to DB...');
         pool.end();
+        pool = createPool();
         return res.status(500).end("database down");
     });
 })
@@ -574,7 +591,9 @@ app.get("/course/:pid/download", downloadLimit, (req, res) => {
                 return res.status(500).end("request error");
             })
         }).catch(err => {
+        console.log('Reconnecting to DB...');
         pool.end();
+        pool = createPool();
         return res.status(500).end("database down");
     });
 })
@@ -601,7 +620,9 @@ app.get("/course/:pid/preview", courseThumbRequestLimit, (req, res) => {
                 return res.status(500).end("request error");
             })
         }).catch(err => {
+        console.log('Reconnecting to DB...');
         pool.end();
+        pool = createPool();
         return res.status(500).end("database down");
     });
 })
@@ -646,7 +667,9 @@ app.get('/user/:pid', courseRequestLimit, function (req, res) {
                 return res.status(500).end("request error");
             })
         }).catch(err => {
+        console.log('Reconnecting to DB...');
         pool.end();
+        pool = createPool();
         return res.status(500).end("database down");
     });
 })
