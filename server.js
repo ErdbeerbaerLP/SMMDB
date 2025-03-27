@@ -256,7 +256,7 @@ app.get("/api/course/search/:offset", courseRequestLimit, (req, res) => {
 
         }).catch(err => {
         console.log(err);
-        pool.end();
+        
         return res.status(500).end("database down");
     });
 })
@@ -291,7 +291,7 @@ app.get("/api/course/:pid", courseRequestLimit, (req, res) => {
                 return res.status(500).end("request error");
             })
         }).catch(err => {
-        pool.end();
+        
         return res.status(500).end("database down");
     });
 });
@@ -310,7 +310,7 @@ app.get("/api/stats", (req, res) => {
                 return res.status(500).end("request error");
             })
         }).catch(err => {
-        pool.end();
+        
         return res.status(500).end("database down");
     });
 });
@@ -334,7 +334,7 @@ app.get("/course/random", courseRequestLimit, (req, res) => {
             })
 
         }).catch(err => {
-        pool.end();
+        
         return res.status(500).end("database down");
     });
 })
@@ -464,7 +464,7 @@ app.get("/course/:pid", courseRequestLimit, (req, res) => {
                 return res.status(500).end("request error");
             })
         }).catch(err => {
-        pool.end();
+        
         return res.status(500).end("database down");
     });
 })
@@ -491,7 +491,6 @@ app.get("/course/:pid/thumb", courseThumbRequestLimit, (req, res) => {
                 return res.status(500).end("request error");
             })
         }).catch(err => {
-        pool.end();
         return res.status(500).end("database down");
     });
 })
@@ -574,7 +573,7 @@ app.get("/course/:pid/download", downloadLimit, (req, res) => {
                 return res.status(500).end("request error");
             })
         }).catch(err => {
-        pool.end();
+        
         return res.status(500).end("database down");
     });
 })
@@ -601,7 +600,7 @@ app.get("/course/:pid/preview", courseThumbRequestLimit, (req, res) => {
                 return res.status(500).end("request error");
             })
         }).catch(err => {
-        pool.end();
+        
         return res.status(500).end("database down");
     });
 })
@@ -646,7 +645,7 @@ app.get('/user/:pid', courseRequestLimit, function (req, res) {
                 return res.status(500).end("request error");
             })
         }).catch(err => {
-        pool.end();
+        
         return res.status(500).end("database down");
     });
 })
