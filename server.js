@@ -223,13 +223,15 @@ app.get("/api/course/search/:offset", courseRequestLimit, (req, res) => {
     }
 
     if (showDeleted) {
-        if (where !== "") where += " AND ";
-        if (showDeleted === "true")
+        if (showDeleted === "true") {
+            if (where !== "") where += " AND ";
             where += "l.`deleted` = 1";
-        if (showDeleted === "false")
+        }
+        if (showDeleted === "false") {
+            if (where !== "") where += " AND ";
             where += "l.`deleted` = 0";
-        if (showDeleted === "include")
-            where += "l.`deleted` = 0";
+        }
+        if (showDeleted === "include") ;
     } else {
         if (where !== "") where += " AND ";
         where += "l.`deleted` = 0";
@@ -471,7 +473,7 @@ app.get("/course/:pid", courseRequestLimit, (req, res) => {
                         best_clear_name: row.best_clear_name,
                         best_clear_score: row.best_clear_score,
                         last_updated: row.last_updated,
-                        deleted: row.deleted,
+                        deleted: row.deleted==1,
                         timelimit: row.timelimit,
                         gamestyle: row.gamestyle,
                         theme: row.theme,
