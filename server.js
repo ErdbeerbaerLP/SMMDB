@@ -102,7 +102,8 @@ app.get("/api/course/search/:offset", courseRequestLimit, (req, res) => {
         hasSubworld,
         sort,
         hasFirstClear,
-        limit
+        limit,
+        showDeleted
     } = req.query;
     let sorting = "";
     switch (sort) {
@@ -221,6 +222,20 @@ app.get("/api/course/search/:offset", courseRequestLimit, (req, res) => {
             where += "l.`first_clear_pid` IS NULL"
     }
 
+    if (showDeleted) {
+        if (where !== "") where += " AND ";
+        if (showDeleted === "true")
+            where += "l.`deleted` = 1";
+        if (showDeleted === "false")
+            where += "l.`deleted` = 0";
+        if (showDeleted === "include")
+            where += "l.`deleted` = 0";
+    } else {
+        if (where !== "") where += " AND ";
+        where += "l.`deleted` = 0";
+    }
+
+
     let lim = 25
     if (limit) {
         lim = parseInt(limit)
@@ -272,7 +287,7 @@ app.get("/api/course/:pid", courseRequestLimit, (req, res) => {
     pool.getConnection()
         .then(conn => {
             conn.query("SELECT `levelid`, `levelcode`, l.`name`, `creation`, `ownerid`, `autoscroll`, `theme`, `subtheme`, `gamestyle`, `objcount`, `subobjcount`, `timelimit`, `stars`, `first_clear_time`,`best_clear_time`,`best_clear_score`," +
-                " `attempts`, `clears`, `thumb`, `preview`, `last_updated`," +
+                " `attempts`, `clears`, `thumb`, `preview`, `last_updated`, `deleted`," +
 
                 "u.`pnid`, u.`name` AS `owner_name`, " +
                 "    fc.`pid` AS `first_clear_pid`, \n" +
@@ -333,7 +348,7 @@ app.get("/api/curcommit", (req, res) => {
 app.get("/course/random", courseRequestLimit, (req, res) => {
     pool.getConnection()
         .then(conn => {
-            conn.query("SELECT levelid FROM levels ORDER BY RAND() LIMIT 1;")
+            conn.query("SELECT levelid FROM levels WHERE `deleted` = 0 ORDER BY RAND() LIMIT 1;")
                 .then((rows) => {
                     console.log("Selecting course " + rows[0].levelid)
                     res.status(301).set("Cache-Control", "no-store").location("/course/" + rows[0].levelid).end();
@@ -393,6 +408,7 @@ app.get("/course/:pid", courseRequestLimit, (req, res) => {
                 "    l.`thumb`, \n" +
                 "    l.`preview`, \n" +
                 "    l.`last_updated`, \n" +
+                "    l.`deleted`, \n" +
                 "    u.`pnid`, \n" +
                 "    u.`name` AS `owner_name`, \n" +
                 "    fc.`pid` AS `first_clear_pid`, \n" +
@@ -415,7 +431,6 @@ app.get("/course/:pid", courseRequestLimit, (req, res) => {
                         res.status(404).render("pages/course_404");
                         return;
                     }
-                    console.log(row)
                     patchImages(row)
                     const theme = {
                         0: "Overworld",
@@ -456,6 +471,7 @@ app.get("/course/:pid", courseRequestLimit, (req, res) => {
                         best_clear_name: row.best_clear_name,
                         best_clear_score: row.best_clear_score,
                         last_updated: row.last_updated,
+                        deleted: row.deleted,
                         timelimit: row.timelimit,
                         gamestyle: row.gamestyle,
                         theme: row.theme,

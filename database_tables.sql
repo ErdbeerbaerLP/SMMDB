@@ -35,6 +35,7 @@ create or replace table levels
     last_updated     bigint                                  not null,
     overworld        longblob /*M!100301 COMPRESSED*/        null,
     subworld         longblob /*M!100301 COMPRESSED*/        null,
+    deleted          tinyint(1)                   default 0  not null,
     constraint best_clear
         foreign key (best_clear_pid) references users (pid),
     constraint first_clear

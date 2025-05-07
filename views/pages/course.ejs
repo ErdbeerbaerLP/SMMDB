@@ -2,6 +2,8 @@
 <html>
 <head>
     <%- include('../partials/head'); %>
+
+    <% if (deleted == false) { %>
     <title><%= levelname %> by <%= owner_name %> - Super Mario Maker Database</title>
     <meta property="og:title" content="<%= levelname %> by <%= owner_name %> - Super Mario Maker Database"/>
     <meta property="og:type" content="website"/>
@@ -12,15 +14,22 @@
 
     <!-- Include this to make the og:image larger -->
     <meta name="twitter:card" content="summary_large_image">
+
+    <% } %>
 </head>
 <body>
 <%- include('../partials/header'); %>
 <h1>Course Details</h1>
 <div class="cards">
     <div class="fullcard">
+        <% if (deleted !== false) { %>
+            <h1 style="color:red;text-decoration: underline;">This Course has been marked as deleted!</h1>
+            <h2 style="color:red;">You will not be able to find it on the network anymore!</h2>
+        <% } %>
         <div class="fullcard_cont">
             <h2><%= levelname %></h2>
-            <h5><%= levelid %></h5>
+            <h5<% if (deleted !== false) { %> style="text-decoration: line-through;">
+                <% } %><%= levelid %></h5>
             <%- include('../partials/user_profile', {pid: owner_id, name: owner_name, pnid: owner_pnid}); %>
             <h4><%= stars %><span class="star">☆️</span></h4>
             <img src="<%= thumbnail %>" alt="Level Thumbnail"><br><br>
