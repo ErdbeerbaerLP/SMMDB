@@ -16,11 +16,12 @@
 <button id="loadMore">Load more...</button><br><br><br><br><br>
 <script>
     let offset = 0;
+    let seed=Math.round(Math.random()*9999999999); //Random static seed to prevent duplicates in a single search
     let initial = true;
     let donotload = false;
     $(document).ready(function () {
         function loadCourses() {
-            $.getJSON(`/api/course/search/${offset}?query=<%= query %>&ownername=<%= ownername %>&pnid=<%= pnid %>&ownerpid=<%= ownerpid %>&uploadmin=<%= uploadmin %>&uploadmax=<%= uploadmax %>&minstars=<%= minstars %>&maxstars=<%= maxstars %>&minobj=<%= minobj %>&maxobj=<%= maxobj %>&hasSubworld=<%= hasSubworld %>&sort=<%= sort %>&game=<%= game %>&autoscroll=<%= autoscroll %>&subautoscroll=<%= subautoscroll %>&hasFirstClear=<%= hasFirstClear %><%- typeof showDeleted !== "undefined" ? `&showDeleted=${showDeleted}` : '' %>`, function (data) {
+            $.getJSON(`/api/course/search/${offset}?seed=${seed}query=<%= query %>&ownername=<%= ownername %>&pnid=<%= pnid %>&ownerpid=<%= ownerpid %>&uploadmin=<%= uploadmin %>&uploadmax=<%= uploadmax %>&minstars=<%= minstars %>&maxstars=<%= maxstars %>&minobj=<%= minobj %>&maxobj=<%= maxobj %>&hasSubworld=<%= hasSubworld %>&sort=<%= sort %>&game=<%= game %>&autoscroll=<%= autoscroll %>&subautoscroll=<%= subautoscroll %>&hasFirstClear=<%= hasFirstClear %><%- typeof showDeleted !== "undefined" ? `&showDeleted=${showDeleted}` : '' %>`, function (data) {
                 console.log(data.length === 0)
                 if (data.length === 0 && initial) {
                     var cardHtml = `

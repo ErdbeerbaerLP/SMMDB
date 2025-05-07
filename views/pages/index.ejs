@@ -23,10 +23,11 @@
 <script>
     let offset = 0;
     let initial = true;
+    let seed=Math.round(Math.random()*9999999999); //Random static seed to prevent duplicates in a single search
     let donotload = false;
     $(document).ready(function () {
         function loadCourses() {
-            $.getJSON(`/api/course/search/${offset}?sort=random`, function (data) {
+            $.getJSON(`/api/course/search/${offset}?seed=${seed}&sort=random`, function (data) {
                 console.log(data.length === 0)
                 if (data.length === 0 && initial) {
                     var cardHtml = `

@@ -87,6 +87,7 @@ app.set('view engine', 'ejs');
 app.get("/api/course/search/:offset", courseRequestLimit, (req, res) => {
     const {offset} = req.params;
     const {
+        seed,
         query,
         uploadmin,
         uploadmax,
@@ -132,7 +133,7 @@ app.get("/api/course/search/:offset", courseRequestLimit, (req, res) => {
             sorting = "ORDER BY `l`.`creation` ASC";
             break;
         default:
-            sorting = "ORDER BY RAND()";
+            sorting = "ORDER BY RAND("+(seed && !isNaN(seed)?parseInt(seed):"")+")";
             break;
     }
 
