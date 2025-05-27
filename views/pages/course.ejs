@@ -30,7 +30,7 @@
         <% } %>
         <div class="fullcard_cont">
             <h2><%= levelname %></h2>
-            <h5<% if (deleted !== false) { %> style="text-decoration: line-through;">
+            <h5><% if (deleted !== false) { %> style="text-decoration: line-through;"
                 <% } %><%= levelid %></h5>
             <%- include('../partials/user_profile', {pid: owner_id, name: owner_name, pnid: owner_pnid}); %>
             <h4><%= stars %><span class="star">☆️</span></h4>

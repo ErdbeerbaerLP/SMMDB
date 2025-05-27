@@ -269,6 +269,10 @@ app.get("/api/course/search/:offset", courseRequestLimit, (req, res) => {
                 "LIMIT " + lim + " OFFSET ? ";
             console.log(query)
             conn.query(query, [...vars, parseInt(offset)]).then((rows) => {
+                res.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+                res.set('Pragma', 'no-cache');
+                res.set('Expires', '0');
+                res.set('Surrogate-Control', 'no-store');
                 res.status(200).end(JSON.stringify(rows));
                 conn.end();
             }).catch(err => {
@@ -308,6 +312,7 @@ app.get("/api/course/:pid", courseRequestLimit, (req, res) => {
                     let row = rows[0]
                     console.log(row)
                     patchImages(row)
+                    res.set('Cache-Control', 'public, max-age=3600, stale-while-revalidate=14400');
                     res.status(200).end(JSON.stringify(row));
                     conn.end();
                 }).catch(err => {
@@ -329,6 +334,10 @@ app.get("/api/stats", (req, res) => {
             conn.query("SELECT (SELECT COUNT(`levelid`) FROM `levels`) AS levelcount,  (SELECT COUNT(`pid`) FROM `users`) AS usercount;")
                 .then((rows) => {
                     let row = rows[0]
+                    res.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+                    res.set('Pragma', 'no-cache');
+                    res.set('Expires', '0');
+                    res.set('Surrogate-Control', 'no-store');
                     res.status(200).end(JSON.stringify(row));
                     conn.end();
                 }).catch(err => {
@@ -344,6 +353,10 @@ app.get("/api/stats", (req, res) => {
     });
 });
 app.get("/api/curcommit", (req, res) => {
+    res.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+    res.set('Pragma', 'no-cache');
+    res.set('Expires', '0');
+    res.set('Surrogate-Control', 'no-store');
     res.send({hash: git.short("."), remote: git.remoteUrl(".")})
 });
 
@@ -354,7 +367,11 @@ app.get("/course/random", courseRequestLimit, (req, res) => {
             conn.query("SELECT levelid FROM levels WHERE `deleted` = 0 ORDER BY RAND() LIMIT 1;")
                 .then((rows) => {
                     console.log("Selecting course " + rows[0].levelid)
-                    res.status(301).set("Cache-Control", "no-store").location("/course/" + rows[0].levelid).end();
+                    res.status(302).set('Cache-Control', 'no-store, no-cache')
+                        .set('Pragma', 'no-cache')
+                        .set('Expires', '0')
+                        .set('Surrogate-Control', 'no-store')
+                        .set('Location',"/course/" + rows[0].levelid).end();
                     conn.end();
                 }).catch(err => {
                 console.log(err);
@@ -376,6 +393,10 @@ app.get('/course/search', function (req, res) {
 app.use(express.urlencoded({extended: true}))
 app.post('/course/search', function (req, res) {
     console.log(req.body)
+    res.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+    res.set('Pragma', 'no-cache');
+    res.set('Expires', '0');
+    res.set('Surrogate-Control', 'no-store');
     res.render('pages/searchresults', req.body);
     res.status(200).end(JSON.stringify());
 })
@@ -386,7 +407,12 @@ app.get("/course/:pid", courseRequestLimit, (req, res) => {
 
         // Convert the resulting cleaned hex string to a decimal number
         pid = parseInt(cleanedHex, 16);
-
+        res.status(301).set('Cache-Control', 'no-store, no-cache')
+            .set('Pragma', 'no-cache')
+            .set('Expires', '0')
+            .set('Surrogate-Control', 'no-store')
+            .set('Location',"/course/" + pid).end();
+        return;
     }
     pool.getConnection()
         .then(conn => {
@@ -455,6 +481,7 @@ app.get("/course/:pid", courseRequestLimit, (req, res) => {
                         2: "Medium",
                         3: "Fast",
                     };
+                    res.set('Cache-Control', 'public, max-age=3600, stale-while-revalidate=14400');
                     res.render('pages/course', {
                         levelname: row.name,
                         stars: row.stars,
@@ -517,6 +544,7 @@ app.get("/course/:pid/thumb", courseThumbRequestLimit, (req, res) => {
                         return;
                     }
                     res.set("Content-Type", "image/jpeg");
+                    res.set('Cache-Control', 'public, max-age=31536000, immutable');
                     res.send(row.thumb)
                     conn.end();
                 }).catch(err => {
@@ -599,7 +627,7 @@ app.get("/course/:pid/download", downloadLimit, (req, res) => {
                         const filename = `[${pid}] ${name}.zip`;
                         res.set('Content-Disposition', `attachment; filename="${filename}"`);
                         var options = {base64: false, type: "nodebuffer", compression: 'DEFLATE'};
-                        res.send(zip.generate(options))
+                        res.set('Cache-Control', 'public, max-age=31536000, immutable').send(zip.generate(options));
                     } else {
                         res.status(404).end("Whole level files not indexed!")
                     }
@@ -631,6 +659,7 @@ app.get("/course/:pid/preview", courseThumbRequestLimit, (req, res) => {
                         return;
                     }
                     res.set("Content-Type", "image/jpeg");
+                    res.set('Cache-Control', 'public, max-age=31536000, immutable');
                     res.send(row.preview)
                     conn.end();
                 }).catch(err => {
@@ -693,9 +722,11 @@ app.get('/user/:pid', courseRequestLimit, function (req, res) {
     });
 })
 app.get('/partial/course', (req, res) => {
+    res.set('Cache-Control', 'public, max-age=3600, stale-while-revalidate=14400');
     res.render('partials/course_card', req.query);
 });
 app.get('/partial/user', (req, res) => {
+    res.set('Cache-Control', 'public, max-age=3600, stale-while-revalidate=14400');
     res.render('partials/user_profile', req.query);
 });
 
