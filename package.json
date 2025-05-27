@@ -24,12 +24,12 @@
   },
   "homepage": "https://github.com/ErdbeerbaerLP/SMMDB#readme",
   "dependencies": {
-    "ejs": "^3.1.10",
-    "express": "^4.19.2",
-    "express-rate-limit": "^7.5.0",
-    "mariadb": "^3.4.0",
-    "crc-32": "^1.2.2",
-    "git-rev-sync": "^3.0.2",
-    "node-zip": "^1.1.1"
+    "ejs": "^3.1",
+    "express": "^5.1",
+    "express-rate-limit": "^7.5",
+    "mariadb": "^3.4",
+    "crc-32": "^1.2",
+    "git-rev-sync": "^3.0",
+    "node-zip": "^1.1"
   }
 }
