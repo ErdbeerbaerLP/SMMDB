@@ -21,7 +21,7 @@
     let donotload = false;
     $(document).ready(function () {
         function loadCourses() {
-            $.getJSON(`/api/course/search/${offset}?seed=${seed}query=<%= query %>&ownername=<%= ownername %>&pnid=<%= pnid %>&ownerpid=<%= ownerpid %>&uploadmin=<%= uploadmin %>&uploadmax=<%= uploadmax %>&minstars=<%= minstars %>&maxstars=<%= maxstars %>&minobj=<%= minobj %>&maxobj=<%= maxobj %>&hasSubworld=<%= hasSubworld %>&sort=<%= sort %>&game=<%= game %>&autoscroll=<%= autoscroll %>&subautoscroll=<%= subautoscroll %>&hasFirstClear=<%= hasFirstClear %><%- typeof showDeleted !== "undefined" ? `&showDeleted=${showDeleted}` : '' %>`, function (data) {
+            $.getJSON(`/api/course/search/${offset}?seed=${seed}&query=<%= query %>&ownername=<%= ownername %>&pnid=<%= pnid %>&ownerpid=<%= ownerpid %>&uploadmin=<%= uploadmin %>&uploadmax=<%= uploadmax %>&minstars=<%= minstars %>&maxstars=<%= maxstars %>&minobj=<%= minobj %>&maxobj=<%= maxobj %>&hasSubworld=<%= hasSubworld %>&sort=<%= sort %>&game=<%= game %>&autoscroll=<%= autoscroll %>&subautoscroll=<%= subautoscroll %>&hasFirstClear=<%= hasFirstClear %><%- typeof showDeleted !== "undefined" ? `&showDeleted=${showDeleted}` : '' %>`, function (data) {
                 console.log(data.length === 0)
                 if (data.length === 0 && initial) {
                     var cardHtml = `

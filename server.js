@@ -396,9 +396,8 @@ app.post('/course/search', function (req, res) {
     res.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
     res.set('Pragma', 'no-cache');
     res.set('Expires', '0');
-    res.set('Surrogate-Control', 'no-store');
-    res.render('pages/searchresults', req.body);
-    res.status(200).end(JSON.stringify());
+    res.set('Surrogate-Control', 'no-store')
+        .status(200).render('pages/searchresults', req.body);
 })
 app.get("/course/:pid", courseRequestLimit, (req, res) => {
     let {pid} = req.params;
