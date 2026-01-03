@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <%- include('../partials/head'); %>
+</head>
+<body>
+
+<%- include('../partials/header'); %>
+<h1>Course Viewer</h1>
+<!-- Main -->
+
+<div class="container">
+    <span id="overworldInfo" class="overworldInfo"></span>
+    <hr>
+    <div style="width:  00%; overflow: auto;">
+        <span id="overworldCanvas"></span>
+    </div>
+    <span id="subworldInfo" class="subworldInfo"></span>
+    <hr>
+    <div style="width: 100%;  overflow: auto;">
+        <span id="subworldCanvas"></span>
+    </div>
+</div>
+
+
+<!-- SmmCourseViewer -->
+<script src="/smm-course-viewer/lib/CourseObject.js"></script>
+<script src="/smm-course-viewer/lib/BlockObject.js"></script>
+<script src="/smm-course-viewer/lib/MonsterObject.js"></script>
+<script src="/smm-course-viewer/lib/Course.js"></script>
+<script src="/smm-course-viewer/lib/SmmCourseViewer.js"></script>
+<!-- SmmCourseViewer::Draw -->
+<script src="/smm-course-viewer/draw/BlockDraw.js"></script>
+<script src="/smm-course-viewer/draw/MonsterDraw.js"></script>
+<script src="/smm-course-viewer/draw/Draw.js"></script>
+<script>
+
+    /* -------------------------------------- */
+    /* select::get selected value */
+    function getSelectedSize() {
+        /*var selectElement = document.getElementById('selectSize');
+        var selected = selectElement.options[selectElement.selectedIndex].value;*/
+        return 32;
+    }
+
+
+    /* -------------------------------------- */
+    /* interpreter::get defaul example */
+    function load(target) {
+        /* get file object */
+        var xhr = new XMLHttpRequest();
+        xhr.onload = function () {
+            interpretCourse(xhr.response, target); /* xhr.response is now a blob object ~ File */
+        }
+        /* force the HTTP response, response-type header to be blob */
+        xhr.open('GET', "load-" + target);
+        xhr.responseType = "blob";
+        xhr.send();
+    }
+
+
+    /* interpreter::read the file */
+    function interpretCourse(file, target) {
+        /* instance the course viewer */
+        smmCourseViewer = new _SmmCourseViewer();
+        smmCourseViewer.read(file, function (err, course, objects) {
+            if (err) alert('Error: corrupted file!');
+            else {
+                console.log('smmCourseViewer: ready!');
+                document.getElementById(target + "Info").innerHTML = smmCourseViewer.course.getHtml();
+                let sizeBase = getSelectedSize();
+                new Draw(target + "Canvas", course, objects, sizeBase);
+            }
+        });
+    }
+
+    /* -------------------------------------- */
+    /* window::check functionalities */
+    window.onload = function () {
+
+        load("overworld");
+        setTimeout(function () {
+            load("subworld");
+        }, 1000);
+
+    }
+
+</script>
+
+<br><br>
+<br><br>
+<br><br>
+<br><br>
+<%- include('../partials/footer'); %>
+</body>
+</html>

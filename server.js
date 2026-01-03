@@ -3,7 +3,11 @@ import mariadb from "mariadb";
 import crc_32 from "crc-32";
 import git from "git-rev-sync";
 import Zip from "node-zip";
+import path from "node:path";
+import os from "node:os";
+import fs from "node:fs";
 import {rateLimit} from 'express-rate-limit'
+import smmCourseViewer from "./smm-course-viewer/lib/main.js";
 
 let {
     SMMDB_DBUSER = "smmdb",
@@ -133,7 +137,7 @@ app.get("/api/course/search/:offset", courseRequestLimit, (req, res) => {
             sorting = "ORDER BY `l`.`creation` ASC";
             break;
         default:
-            sorting = "ORDER BY RAND("+(seed && !isNaN(seed)?parseInt(seed):"")+")";
+            sorting = "ORDER BY RAND(" + (seed && !isNaN(seed) ? parseInt(seed) : "") + ")";
             break;
     }
 
@@ -371,7 +375,7 @@ app.get("/course/random", courseRequestLimit, (req, res) => {
                         .set('Pragma', 'no-cache')
                         .set('Expires', '0')
                         .set('Surrogate-Control', 'no-store')
-                        .set('Location',"/course/" + rows[0].levelid).end();
+                        .set('Location', "/course/" + rows[0].levelid).end();
                     conn.end();
                 }).catch(err => {
                 console.log(err);
@@ -410,7 +414,7 @@ app.get("/course/:pid", courseRequestLimit, (req, res) => {
             .set('Pragma', 'no-cache')
             .set('Expires', '0')
             .set('Surrogate-Control', 'no-store')
-            .set('Location',"/course/" + pid).end();
+            .set('Location', "/course/" + pid).end();
         return;
     }
     pool.getConnection()
@@ -500,7 +504,7 @@ app.get("/course/:pid", courseRequestLimit, (req, res) => {
                         best_clear_name: row.best_clear_name,
                         best_clear_score: row.best_clear_score,
                         last_updated: row.last_updated,
-                        deleted: row.deleted==1,
+                        deleted: row.deleted == 1,
                         timelimit: row.timelimit,
                         gamestyle: row.gamestyle,
                         theme: row.theme,
@@ -643,6 +647,106 @@ app.get("/course/:pid/download", downloadLimit, (req, res) => {
         return res.status(500).end("database down");
     });
 })
+app.use("/course/:pid/layout",express.static("smm-viewer-assets"));
+app.get('/course/:pid/viewer', (req, res) => {
+    const {pid} = req.params;
+    pool.getConnection()
+        .then(conn => {
+            conn.query(
+                "SELECT `overworld`, `subworld`, `thumb`, `preview`, `ownerid`, `name` FROM `levels` WHERE `levelid` = ?",
+                [pid]
+            )
+                .then((rows) => {
+                    let row = rows[0]
+                    if (row === undefined) {
+                        res.status(404).render("pages/course_404");
+                        return;
+                    }
+                    const tmpPath = path.join(os.tmpdir(), `course_${Date.now()}.cdt`);
+                    fs.writeFileSync(tmpPath, row.overworld);
+                    smmCourseViewer.read(tmpPath, (err, course, objects) => {
+                        if (err) {
+                            return res.status(500).send('Error reading course file.');
+                        }
+                        res.render('pages/viewer', {course, objects});
+                        fs.unlinkSync(tmpPath);
+                    });
+                });
+        });
+});
+app.get('/course/:pid/load-overworld', (req, res) => {
+    const {pid} = req.params;
+    pool.getConnection()
+        .then(conn => {
+            conn.query(
+                "SELECT `overworld` FROM `levels` WHERE `levelid` = ?",
+                [pid]
+            )
+                .then((rows) => {
+                    let row = rows[0]
+                    if (row === undefined) {
+                        res.status(404).render("pages/course_404");
+                        return;
+                    }
+                    res.set("Content-Type", "application/octet-stream");
+                    res.set('Cache-Control', 'public, max-age=31536000, immutable');
+                    res.send(row.overworld)
+                    conn.end();
+                });
+        });
+});
+app.get('/course/:pid/load-subworld', (req, res) => {
+    const {pid} = req.params;
+    pool.getConnection()
+        .then(conn => {
+            conn.query(
+                "SELECT `subworld` FROM `levels` WHERE `levelid` = ?",
+                [pid]
+            )
+                .then((rows) => {
+                    let row = rows[0]
+                    if (row === undefined) {
+                        res.status(404).render("pages/course_404");
+                        return;
+                    }
+                    res.set("Content-Type", "application/octet-stream");
+                    res.set('Cache-Control', 'public, max-age=31536000, immutable');
+                    res.send(row.subworld)
+                    conn.end();
+                });
+        });
+});
+
+app.get("/course/:pid/preview", courseThumbRequestLimit, (req, res) => {
+    const {pid} = req.params;
+    pool.getConnection()
+        .then(conn => {
+            conn.query(
+                "SELECT `preview` FROM `levels` WHERE `levelid` = ?",
+                [pid]
+            )
+                .then((rows) => {
+                    let row = rows[0]
+                    if (row === undefined) {
+                        res.status(404);
+                        return;
+                    }
+                    res.set("Content-Type", "image/jpeg");
+                    res.set('Cache-Control', 'public, max-age=31536000, immutable');
+                    res.send(row.preview)
+                    conn.end();
+                }).catch(err => {
+                console.log(err);
+                conn.end();
+                return res.status(500).end("request error");
+            })
+        }).catch(err => {
+        console.log('Reconnecting to DB...');
+        pool.end();
+        pool = createPool();
+        return res.status(500).end("database down");
+    });
+})
 app.get("/course/:pid/preview", courseThumbRequestLimit, (req, res) => {
     const {pid} = req.params;
     pool.getConnection()
@@ -729,8 +833,12 @@ app.get('/partial/user', (req, res) => {
     res.render('partials/user_profile', req.query);
 });
 
-app.use(express.static("html/"));
-app.listen(process.env.PORT ?? 8764);
+
+
+
+app.use("/smm-course-viewer",express.static("smm-course-viewer"));
+
+app.use(express.static("html"));
 app.use(function (req, res, next) {
     res.status(404);
 
@@ -748,3 +856,5 @@ app.use(function (req, res, next) {
 
     res.type('txt').send('Not found');
 });
+
+app.listen(process.env.PORT ?? 8764);

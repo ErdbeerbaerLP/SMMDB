@@ -1,3 +1,9 @@
 [submodule "PretendoClients"]
 	path = PretendoClients
 	url = https://github.com/Milk-Cool/PretendoClients.git
+[submodule "public/vendor/smm-course-viewer"]
+	path = public/vendor/smm-course-viewer
+	url = https://github.com/leomaurodesenv/smm-course-viewer.git
+[submodule "smm-course-viewer"]
+	path = smm-course-viewer
+	url = https://github.com/leomaurodesenv/smm-course-viewer.git
