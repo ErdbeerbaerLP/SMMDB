@@ -69,7 +69,7 @@ function createPool() {
         password: SMMDB_DBPASSWORD,
         port: SMMDB_DBPORT,
         database: SMMDB_DBNAME,
-        connectionLimit: 15
+        connectionLimit: 500
     });
 }
 
