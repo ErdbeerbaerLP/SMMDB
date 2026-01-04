@@ -3,11 +3,7 @@ import mariadb from "mariadb";
 import crc_32 from "crc-32";
 import git from "git-rev-sync";
 import Zip from "node-zip";
-import path from "node:path";
-import os from "node:os";
-import fs from "node:fs";
 import {rateLimit} from 'express-rate-limit'
-import smmCourseViewer from "./smm-course-viewer/lib/main.js";
 
 let {
     SMMDB_DBUSER = "smmdb",
@@ -653,7 +649,41 @@ app.get('/course/:pid/viewer', (req, res) => {
     pool.getConnection()
         .then(conn => {
             conn.query(
-                "SELECT `overworld`, `subworld`, `thumb`, `preview`, `ownerid`, `name` FROM `levels` WHERE `levelid` = ?",
+                "SELECT \n" +
+                "    l.`levelid`, \n" +
+                "    l.`levelcode`, \n" +
+                "    l.`name`, \n" +
+                "    l.`creation`, \n" +
+                "    l.`ownerid`, \n" +
+                "    l.`autoscroll`,\n" +
+                "    l.`subautoscroll`, \n" +
+                "    l.`theme`, \n" +
+                "    l.`subtheme`, \n" +
+                "    l.`gamestyle`, \n" +
+                "    l.`objcount`, \n" +
+                "    l.`subobjcount`, \n" +
+                "    l.`timelimit`, \n" +
+                "    l.`stars`, \n" +
+                "    l.`attempts`, \n" +
+                "    l.`clears`, \n" +
+                "    l.`thumb`, \n" +
+                "    l.`preview`, \n" +
+                "    l.`last_updated`, \n" +
+                "    l.`deleted`, \n" +
+                "    u.`pnid`, \n" +
+                "    u.`name` AS `owner_name`, \n" +
+                "    fc.`pid` AS `first_clear_pid`, \n" +
+                "    fc.`pnid` AS `first_clear_pnid`, \n" +
+                "    fc.`name` AS `first_clear_name`, \n" +
+                "    bc.`pid` AS `best_clear_pid`, \n" +
+                "    bc.`pnid` AS `best_clear_pnid`, \n" +
+                "    bc.`name` AS `best_clear_name`,\n" +
+                "    l.`best_clear_score`\n" +
+                "FROM `levels` l\n" +
+                "JOIN `users` u ON l.`ownerid` = u.`pid`\n" +
+                "LEFT JOIN `users` fc ON l.`first_clear_pid` = fc.`pid`\n" +
+                "LEFT JOIN `users` bc ON l.`best_clear_pid` = bc.`pid`\n" +
+                "WHERE l.`levelid` = ?",
                 [pid]
             )
                 .then((rows) => {
@@ -662,16 +692,63 @@ app.get('/course/:pid/viewer', (req, res) => {
                         res.status(404).render("pages/course_404");
                         return;
                     }
-                    const tmpPath = path.join(os.tmpdir(), `course_${Date.now()}.cdt`);
-                    fs.writeFileSync(tmpPath, row.overworld);
-                    smmCourseViewer.read(tmpPath, (err, course, objects) => {
-                        if (err) {
-                            return res.status(500).send('Error reading course file.');
-                        }
-                        res.render('pages/viewer', {course, objects});
-                        fs.unlinkSync(tmpPath);
+                    patchImages(row)
+                    const theme = {
+                        0: "Overworld",
+                        1: "Underground",
+                        2: "Castle",
+                        3: "Airship",
+                        4: "Underwater",
+                        5: "Ghost House",
+                    };
+                    const gamestyle = {
+                        "M1": "Super Mario Bros.",
+                        "M3": "Super Mario Bros. 3",
+                        "MW": "Super Mario World",
+                        "WU": "New Super Mario Bros. U",
+                    };
+                    const autoscroll = {
+                        0: "Off",
+                        1: "Slow",
+                        2: "Medium",
+                        3: "Fast",
+                    };
+                    res.set('Cache-Control', 'public, max-age=3600, stale-while-revalidate=14400');
+                        res.render('pages/viewer', {
+                            levelname: row.name,
+                            stars: row.stars,
+                            creation: row.creation,
+                            owner_id: row.ownerid,
+                            thumbnail: row.thumb,
+                            levelid: row.levelcode,
+                            pid: row.levelid,
+                            preview: row.preview,
+                            owner_pnid: row.pnid,
+                            owner_name: row.owner_name,
+                            first_clear_pid: row.first_clear_pid,
+                            first_clear_name: row.first_clear_name,
+                            first_clear_pnid: row.first_clear_pnid,
+                            best_clear_pid: row.best_clear_pid,
+                            best_clear_pnid: row.best_clear_pnid,
+                            best_clear_name: row.best_clear_name,
+                            best_clear_score: row.best_clear_score,
+                            last_updated: row.last_updated,
+                            deleted: row.deleted == 1,
+                            timelimit: row.timelimit,
+                            gamestyle: row.gamestyle,
+                            theme: row.theme,
+                            objcount: row.objcount,
+                            subobjcount: row.subobjcount,
+                            subtheme: row.subtheme,
+                            autoscroll: row.autoscroll,
+                            subautoscroll: row.subautoscroll,
+                            gamestyle_text: gamestyle[row.gamestyle],
+                            theme_text: theme[row.theme],
+                            subtheme_text: theme[row.subtheme],
+                            autoscroll_text: autoscroll[row.autoscroll] ?? "Value out of Bounds (" + row.autoscroll + ")",
+                            subautoscroll_text: autoscroll[row.subautoscroll] ?? "Value out of Bounds (" + row.subautoscroll + ")",
+                        });
                     });
-                });
         });
 });
 app.get('/course/:pid/load-overworld', (req, res) => {
