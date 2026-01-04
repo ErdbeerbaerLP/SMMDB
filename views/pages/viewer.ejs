@@ -2,12 +2,26 @@
 <html lang="en">
 <head>
     <%- include('../partials/head'); %>
+    <% if (deleted == false) { %>
+        <title><%= levelname %> by <%= owner_name %> - Super Mario Maker Database</title>
+        <meta property="og:title" content="Preview of <%= levelname %> by <%= owner_name %> - Super Mario Maker Database"/>
+        <meta property="og:type" content="website"/>
+        <meta property="og:url" content="https://smm.pretendo.zip/course/<%= pid %>/viewer"/>
+        <meta property="og:image" content="https://smm.pretendo.zip/course/<%= pid %>/thumb"/>
+        <meta property="og:description" content="<%= levelid %> - <%= stars %> 🌟"/>
+        <meta name="theme-color" content="#ecce07">
+
+        <!-- Include this to make the og:image larger -->
+        <meta name="twitter:card" content="summary_large_image">
+
+    <% }else{ %>
+        <meta name="robots" content="noindex">
+    <% } %>
 </head>
 <body>
 
 <%- include('../partials/header'); %>
 <h1>Course Viewer</h1>
-<!-- Main -->
 
 <div>
     <span id="overworldInfo" class="overworldInfo"></span>
@@ -23,13 +37,11 @@
 </div>
 
 
-<!-- SmmCourseViewer -->
 <script src="/smm-course-viewer/lib/CourseObject.js"></script>
 <script src="/smm-course-viewer/lib/BlockObject.js"></script>
 <script src="/smm-course-viewer/lib/MonsterObject.js"></script>
 <script src="/smm-course-viewer/lib/Course.js"></script>
 <script src="/smm-course-viewer/lib/SmmCourseViewer.js"></script>
-<!-- SmmCourseViewer::Draw -->
 <script src="/smm-course-viewer/draw/BlockDraw.js"></script>
 <script src="/smm-course-viewer/draw/MonsterDraw.js"></script>
 <script src="/smm-course-viewer/draw/Draw.js"></script>
