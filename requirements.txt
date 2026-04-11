@@ -1,7 +1,7 @@
 asgiref
 pycryptodomex
 anynet
-setuptools
+setuptools==81.0.0
 mariadb
 numpy
 anyio

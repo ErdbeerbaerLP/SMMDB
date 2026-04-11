@@ -2,7 +2,7 @@
     <div class="card" data-levelid="<%= id %>" style="cursor: pointer;">
         <h2><%= name %></h2>
         <h4><%= code %></h4>
-        <h4><%= stars %> ☆️</h4>
+        <h4><%= stars %> ☆ <%= clear_rate %>%🏁️</h4>
         <%- include('../partials/user_profile', {pid: userpid, name: username , pnid: userpnid, clickable: false}); %>
         <img class="thumb" src="/course/<%= id %>/thumb" alt="Thumbnail"><br><br>
         <img class="preview" src="/course/<%= id %>/preview" alt="Preview"><br><br>

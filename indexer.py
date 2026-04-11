@@ -12,16 +12,18 @@ import time
 import anyio
 import mariadb
 from anynet import http
+from anynet.util import catch
 from mariadb import Connection
 from nintendo import nnas
-from nintendo.nex import backend, settings, streams, common, rmc
+from nintendo.nex import backend, settings, streams, common, rmc, ranking, ranking2
 from nintendo.nex import datastore_smm
 from nintendo.nex.authentication import AuthenticationInfo
-from nintendo.nex.common import logger
+from nintendo.nex.common import logger, RMCError
 
+from PretendoClients.nintendo.nex.datastore_smm import DataStoreRatingInfoWithSlot, DataStoreMetaInfo, \
+    DataStoreGetMetaParam
 from decompress import Course
 
-cli: datastore_smm.DataStoreClientSMM = None  # * Gets set later
 connection: Connection = None
 
 logging.basicConfig(level=logging.INFO)
@@ -201,7 +203,7 @@ class DataStoreGetCourseRecordParam(common.Structure):
         stream.u8(self.slot)
 
 
-async def get_course_record(param: DataStoreGetCourseRecordParam) -> DataStoreGetCourseRecordResult:
+async def get_course_record(cli,param: DataStoreGetCourseRecordParam) -> DataStoreGetCourseRecordResult:
     # * --- request ---
     stream = streams.StreamOut(cli.settings)
     stream.add(param)
@@ -230,7 +232,7 @@ class BufferQueueParam(common.Structure):
         stream.u32(self.slot)
 
 
-async def get_buffer_queue(param: BufferQueueParam) -> list[bytes]:
+async def get_buffer_queue(cli,param: BufferQueueParam) -> list[bytes]:
     # * --- request ---
     stream = streams.StreamOut(cli.settings)
     stream.add(param)
@@ -244,7 +246,7 @@ async def get_buffer_queue(param: BufferQueueParam) -> list[bytes]:
     return result
 
 
-async def get_custom_ranking_by_data_id(param: DataStoreGetCustomRankingByDataIdParam) -> rmc.RMCResponse:
+async def get_custom_ranking_by_data_id(cli,param: DataStoreGetCustomRankingByDataIdParam) -> rmc.RMCResponse:
     # * --- request ---
     stream = streams.StreamOut(cli.settings)
     stream.add(param)
@@ -260,14 +262,14 @@ async def get_custom_ranking_by_data_id(param: DataStoreGetCustomRankingByDataId
     return obj
 
 
-async def download_object_buffer_queues(buffer_queues: list[dict], data_id: int, slot: int):
+async def download_object_buffer_queues(cli,buffer_queues: list[dict], data_id: int, slot: int):
     logger.info("download_object_buffer_queues()")
     try:
         param = BufferQueueParam()
         param.data_id = data_id
         param.slot = slot
 
-        response = await get_buffer_queue(param)
+        response = await get_buffer_queue(cli,param)
 
         buffer_queues.append({
             "slot": slot,
@@ -283,7 +285,7 @@ async def download_object_buffer_queues(buffer_queues: list[dict], data_id: int,
         return
 
 
-async def download_object_custom_ranking(custom_rankings: list[dict], data_id: int, application_id: int):
+async def download_object_custom_ranking(cli,custom_rankings: list[dict], data_id: int, application_id: int):
     try:
         param = DataStoreGetCustomRankingByDataIdParam()
         param.application_id = application_id
@@ -314,7 +316,7 @@ def getLevelCode(OBJECT_DATA_ID):
     return f"{checksum.zfill(4)}-{OBJECT_DATA_ID_HEX[0:4]}-{OBJECT_DATA_ID_HEX[4:8]}-{OBJECT_DATA_ID_HEX[8:12]}"  # 2087-FFFF-FFFF-FFFF
 
 
-async def download_course_record(course_records: list[dict], data_id: int, slot: int):
+async def download_course_record(cli, course_records: list[dict], data_id: int, slot: int):
     # * This is expected to fail OFTEN
     # * Only course objects have records
     logger.info("download_course_record()")
@@ -323,7 +325,7 @@ async def download_course_record(course_records: list[dict], data_id: int, slot:
         param.data_id = data_id
         param.slot = slot
 
-        response = await get_course_record(param)
+        response = await get_course_record(cli,param)
 
         course_records.append({
             "slot": response.slot,
@@ -359,8 +361,8 @@ def should_download_object(data_id, size, object_version):
     return True
 
 
-KNOWN_BUFFER_QUEUE_SLOTS = [2]
-#KNOWN_BUFFER_QUEUE_SLOTS = [0, 2, 3, 1, 4]
+#KNOWN_BUFFER_QUEUE_SLOTS = [2]
+KNOWN_BUFFER_QUEUE_SLOTS = [0, 2, 3, 1, 4]
 KNOWN_COURSE_RECORD_SLOTS = [0]
 KNOWN_CUSTOM_RANKING_APPLICATION_IDS = [
     0,
@@ -375,11 +377,33 @@ KNOWN_CUSTOM_RANKING_APPLICATION_IDS = [
 ]
 
 
-async def process_datastore_object(obj: datastore_smm.DataStoreMetaInfo):
-    param = datastore_smm.DataStorePrepareGetParam()
-    param.data_id = obj.data_id
+async def process_smm_level(cli, level_id: int):
 
-    get_object_response = await cli.prepare_get_object(param)
+    print(level_id)
+
+    param = datastore_smm.DataStorePrepareGetParam()
+    param.data_id = level_id
+    try:
+        get_object_response = await cli.prepare_get_object(param)
+    except RMCError as e:
+        if e.result().name() == "DataStore::NotFound":
+            sql = "UPDATE levels SET deleted = 1 WHERE levelid = ?"
+            data = (level_id,)
+            connection.cursor().execute(sql, data)
+            connection.commit()
+            print("Marked level as deleted!" )
+        else:
+            print(e.result().name())
+        return
+    metaparam = datastore_smm.DataStoreGetMetaParam()
+    metaparam.data_id = level_id
+    metaparam.persistence_target = datastore_smm.DataStorePersistenceTarget()
+    metaparam.persistence_target.owner_id = 0
+    metaparam.persistence_target.persistence_id = 0xFFFF
+    metaparam.result_option = 6
+    metaparam.access_password = 0
+    meta: DataStoreMetaInfo = await cli.get_meta(metaparam)
+
     s3_headers = {header.key: header.value for header in get_object_response.headers}
     s3_url = get_object_response.url
     data_id = get_object_response.data_id
@@ -394,24 +418,27 @@ async def process_datastore_object(obj: datastore_smm.DataStoreMetaInfo):
 
     async with anyio.create_task_group() as tg:
         for slot in KNOWN_BUFFER_QUEUE_SLOTS:
-            tg.start_soon(download_object_buffer_queues, buffer_queues, data_id, slot)
+            tg.start_soon(download_object_buffer_queues, cli,buffer_queues, data_id, slot)
 
-    # custom_rankings = []
+    for bq in buffer_queues:
+        print(len(bq["buffers"]))
 
-    # async with anyio.create_task_group() as tg:
-    ##    for application_id in KNOWN_CUSTOM_RANKING_APPLICATION_IDS:
-    #        tg.start_soon(download_object_custom_ranking, custom_rankings, data_id, application_id)
+    custom_rankings = []
+
+    async with anyio.create_task_group() as tg:
+        for application_id in KNOWN_CUSTOM_RANKING_APPLICATION_IDS:
+            tg.start_soon(download_object_custom_ranking, cli,custom_rankings, data_id, application_id)
+
 
     course_records = []
     async with anyio.create_task_group() as tg:
         for slot in KNOWN_COURSE_RECORD_SLOTS:
-            tg.start_soon(download_course_record, course_records, data_id, slot)
+            tg.start_soon(download_course_record, cli,course_records, data_id, slot)
 
     s3_response = await http.get(s3_url, headers=s3_headers)
 
     course = Course(s3_response.body)
 
-    await updateUserInDB(obj.owner_id)
 
     if len(course_records) > 0:
         print("Updating record users...")
@@ -419,10 +446,19 @@ async def process_datastore_object(obj: datastore_smm.DataStoreMetaInfo):
         await updateUserInDB(course_records[0]["first_pid"])
         await updateUserInDB(course_records[0]["best_pid"])
 
-    updateLevelInDB(obj, course, course_records, buffer_queues)
+
+
+
+
+    await updateUserInDB(meta.owner_id)
+
+
+
+    updateLevelInDB(meta, course, course_records, buffer_queues)
 
 
 async def updateUserInDB(pid):
+    return
     nas = nnas.NNASClient()
     mii = await nas.get_mii(pid)
     sql = "INSERT INTO users (pid, name, pnid) VALUES (?,?,?) ON DUPLICATE KEY UPDATE name = VALUES(name), pnid = VALUES(pnid)"
@@ -432,52 +468,14 @@ async def updateUserInDB(pid):
 
     connection.commit()
 
-async def fetchRandomLevels(DEVICE_ID, SERIAL_NUMBER, SYSTEM_VERSION, REGION_ID, COUNTRY_NAME,
-                            LANGUAGE, USERNAME, PASSWORD, CERT):
-    TITLE_ID = 0x000500001018DB00
-    TITLE_VERSION = 272
-    ACCESS_KEY = "9f2b4678"
-    NEX_VERSION = 30803
-    GAME_SERVER_ID = 0x1018DB00
-
-    conn_params = {
-        "user": os.getenv("SMMDB_DBUSER","smmdb"),
-        "password": os.getenv("SMMDB_DBPASSWORD"),
-        "host": os.getenv("SMMDB_DBIP"),
-        "port": int(os.getenv("SMMDB_DBPORT", "3306")),
-        "database": os.getenv("SMMDB_DBNAME", "smmdb")
-    }
-    global connection
-    connection = mariadb.connect(**conn_params)
-    try:
-        nas = nnas.NNASClient()
-        nas.set_device(DEVICE_ID, SERIAL_NUMBER, SYSTEM_VERSION, CERT)
-        nas.set_title(TITLE_ID, TITLE_VERSION)
-        nas.set_locale(REGION_ID, COUNTRY_NAME, LANGUAGE)
-
-        access_token = await nas.login(USERNAME, PASSWORD, "hash")
-
-        s = settings.default()
-        s.configure(ACCESS_KEY, NEX_VERSION)
-
-        nex_token = await nas.get_nex_token(access_token.token, GAME_SERVER_ID)
-        async with backend.connect(s, nex_token.host, nex_token.port) as be:
-            info = AuthenticationInfo()
-            info.token = nex_token.token
-            async with be.login(str(nex_token.pid), nex_token.password, info) as client:
-                global cli
-                cli = datastore_smm.DataStoreClientSMM(client)
-                param = DataStoreSearchParam()
-                param.result_range.size = int(os.getenv("SMMDB_MAXLEVELS", "20"))
-                objects = await getCourses(cli, param)
-                print("Found %d objects" % len(objects))
-                async with anyio.create_task_group() as tg:
-                    for o in objects:
-                        tg.start_soon(run, o)
-    except Exception as e:
-        print(f"Server {hex(TITLE_ID)} down!")
-        logging.exception(e)
-        return False
+async def fetchRandomLevels(cli):
+    param = DataStoreSearchParam()
+    param.result_range.size = int(os.getenv("SMMDB_MAXLEVELS", "20"))
+    objects = await getCourses(cli, param)
+    print("Found %d objects" % len(objects))
+    async with anyio.create_task_group() as tg:
+        for o in objects:
+            tg.start_soon(run, o)
 
 
 async def run(obj):
@@ -487,15 +485,82 @@ async def run(obj):
         get = datastore_smm.DataStorePrepareGetParam()
         get.data_id = level.metaInfo.data_id
         print(getLevelCode(get.data_id))
-        await process_datastore_object(obj.metaInfo)
+        await process_smm_level(level.metaInfo.data_id, level.metaInfo)
     except Exception as e:
         logging.exception(e)
+
+class ClientManager:
+    def __init__(self):
+        self.be = None
+        self.client = None
+        self.cli = None
+
+        # context managers we need to close manually
+        self._be_cm = None
+        self._login_cm = None
+    async def __aenter__(self):
+        DEVICE_ID = int(os.getenv("DEVICE_ID"))
+        SERIAL_NUMBER = os.getenv("SERIAL_NUMBER")
+        SYSTEM_VERSION = int(os.getenv("SYSTEM_VERSION"), 16)
+        REGION_ID = int(os.getenv("REGION_ID"))
+        COUNTRY_NAME = os.getenv("COUNTRY_NAME")
+        LANGUAGE = os.getenv("LANGUAGE")
+        USERNAME = os.getenv("USERNAME")
+        PASSWORD = os.getenv("PASSWORD")
+        CERT = os.getenv("CERT")
+        TITLE_ID = 0x000500001018DB00
+        TITLE_VERSION = 272
+        ACCESS_KEY = "9f2b4678"
+        NEX_VERSION = 30803
+        GAME_SERVER_ID = 0x1018DB00
+
+        nas = nnas.NNASClient()
+        nas.set_device(DEVICE_ID, SERIAL_NUMBER,
+                       SYSTEM_VERSION, CERT)
+        nas.set_title(TITLE_ID, TITLE_VERSION)
+        nas.set_locale(REGION_ID, COUNTRY_NAME, LANGUAGE)
+
+        access_token = await nas.login(USERNAME, PASSWORD, "hash")
+
+        s = settings.default()
+        s.configure(ACCESS_KEY, NEX_VERSION)
+
+        nex_token = await nas.get_nex_token(access_token.token, GAME_SERVER_ID)
+
+        self._be_cm = backend.connect(s, nex_token.host, nex_token.port)
+        self.be = await self._be_cm.__aenter__()
+
+        info = AuthenticationInfo()
+        info.token = nex_token.token
+
+        self._client_cm = self.be.login(
+            str(nex_token.pid),
+            nex_token.password,
+            info
+        )
+        self.client = await self._client_cm.__aenter__()
+
+        self.cli = datastore_smm.DataStoreClientSMM(self.client)
+
+        return self.cli
+    async def __aexit__(self, exc_type, exc, tb):
+        if self._client_cm:
+            await self._client_cm.__aexit__(exc_type, exc, tb)
+
+        if self._be_cm:
+            await self._be_cm.__aexit__(exc_type, exc, tb)
+
+
+
 
 
 def updateLevelInDB(level, course, records, buffer_queues):
     stars = 0
-    attempts = 0
-    clears = 0
+
+    user_plays = level.ratings[0].info.total_value
+    clears = level.ratings[2].info.total_value
+    attempts = level.ratings[3].info.total_value
+    failures = level.ratings[4].info.total_value
     for queue in buffer_queues:
         if queue["slot"] == 2:
             stars = len(queue["buffers"])
@@ -515,7 +580,7 @@ def updateLevelInDB(level, course, records, buffer_queues):
         bestClearScore = records[0]["best_score"]
 
     print("Storing "+level.name+" into the database...")
-    sql = "INSERT INTO levels (levelid, levelcode, name, creation, ownerid, autoscroll, subautoscroll, theme, subtheme, gamestyle, objcount, subobjcount, timelimit, stars, first_clear_pid,first_clear_time,best_clear_pid,best_clear_time,best_clear_score, attempts,clears, thumb, preview, last_updated, overworld, subworld) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) ON DUPLICATE KEY UPDATE name = VALUES(name), thumb = VALUES(thumb), preview = VALUES(preview), last_updated = VALUES(last_updated), stars = VALUES(stars), attempts = VALUES(attempts), clears = VALUES(clears), subautoscroll = VALUES(subautoscroll), overworld = VALUES(overworld), subworld = VALUES(subworld), first_clear_pid = VALUES(first_clear_pid), first_clear_time = VALUES(first_clear_time), best_clear_pid = VALUES(best_clear_pid), best_clear_time = VALUES(best_clear_time), best_clear_score = VALUES(best_clear_score)"
+    sql = "INSERT INTO levels (levelid, levelcode, name, creation, ownerid, autoscroll, subautoscroll, theme, subtheme, gamestyle, objcount, subobjcount, timelimit, stars, first_clear_pid,first_clear_time,best_clear_pid,best_clear_time,best_clear_score, attempts,clears, failures, user_plays, thumb, preview, last_updated, overworld, subworld) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) ON DUPLICATE KEY UPDATE name = VALUES(name), thumb = VALUES(thumb), preview = VALUES(preview), last_updated = VALUES(last_updated), stars = VALUES(stars), attempts = VALUES(attempts), clears = VALUES(clears),failures = VALUES(failures),user_plays = VALUES(user_plays), subautoscroll = VALUES(subautoscroll), overworld = VALUES(overworld), subworld = VALUES(subworld), first_clear_pid = VALUES(first_clear_pid), first_clear_time = VALUES(first_clear_time), best_clear_pid = VALUES(best_clear_pid), best_clear_time = VALUES(best_clear_time), best_clear_score = VALUES(best_clear_score)"
     data = (level.data_id,
             getLevelCode(level.data_id),
             level.name,
@@ -537,43 +602,73 @@ def updateLevelInDB(level, course, records, buffer_queues):
             bestClearScore,
             attempts,
             clears,
+            failures,
+            user_plays,
             course.getThumbnail(),
             course.getPreview(),
             time.time(),
             course.overworld.raw,
             course.subworld.raw
             )
-
     connection.cursor().execute(sql, data)
     connection.commit()
     print("Done")
 
 
-def start(DEVICE_ID, SERIAL_NUMBER, SYSTEM_VERSION, REGION_ID, COUNTRY_NAME,
-          LANGUAGE, USERNAME, PASSWORD, CERT):
-    asyncio.run(fetchRandomLevels(DEVICE_ID, SERIAL_NUMBER, SYSTEM_VERSION, REGION_ID, COUNTRY_NAME,
-                                  LANGUAGE, USERNAME, PASSWORD, CERT))
+def start():
+    asyncio.run(startAsync())
+
+async def startAsync():
+    async with ClientManager() as client:
+        await fetchRandomLevels(client)
+    async with ClientManager() as client:
+        await updateRandomLevels(client)
+
+async def updateRandomLevels(cli):
+    cursor = connection.cursor()
+    query = """
+            SELECT `levelid`
+            FROM levels
+            ORDER BY RAND()
+            LIMIT 25;
+            """
+
+    cursor.execute(query)
+    rows = cursor.fetchall()
+
+    tasks = [process_smm_level(cli,row[0]) for row in rows]
+    await asyncio.gather(*tasks)
+
+async def test():
+    async with ClientManager() as client:
+        await process_smm_level(client, 942943)
+        #await updateRandomLevels(client)
+        #await fetchRandomLevels()
 
 def main():
+    conn_params = {
+        "user": os.getenv("SMMDB_DBUSER","smmdb"),
+        "password": os.getenv("SMMDB_DBPASSWORD"),
+        "host": os.getenv("SMMDB_DBIP"),
+        "port": int(os.getenv("SMMDB_DBPORT", "3306")),
+        "database": os.getenv("SMMDB_DBNAME", "smmdb")
+    }
+    global connection
+    connection = mariadb.connect(**conn_params)
+
+    asyncio.run(test())
     while True:
         time.sleep(1)
         p = multiprocessing.Process(target=start,
-                                    args=((int(os.getenv("DEVICE_ID")),
-                                           os.getenv("SERIAL_NUMBER"),
-                                           int(os.getenv("SYSTEM_VERSION"), 16),
-                                           int(os.getenv("REGION_ID")),
-                                           os.getenv("COUNTRY_NAME"),
-                                           os.getenv("LANGUAGE"),
-                                           os.getenv("USERNAME"),
-                                           os.getenv("PASSWORD"),
-                                           os.getenv("CERT"))
-                                    ))
+                                    args=())
         p.start()
         p.join(30)
         if p.is_alive():
             print("process stuck... let's kill it...")
             p.terminate()
             p.join()
+
+
 
 if __name__ == "__main__":
     main()

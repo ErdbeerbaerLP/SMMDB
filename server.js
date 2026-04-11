@@ -252,7 +252,7 @@ app.get("/api/course/search/:offset", courseRequestLimit, (req, res) => {
             let query = "SELECT l.`levelid`, l.`levelcode`, l.`name`, l.`creation`, l.`ownerid`, " +
                 "l.`autoscroll`, l.`theme`, l.`subtheme`, l.`gamestyle`, l.`objcount`, " +
                 "l.`subobjcount`, l.`timelimit`, l.`stars`, l.`attempts`, " +
-                "l.`clears`, l.`last_updated`, " +
+                "l.`clears`, l.`failures`, l.`user_plays`, l.`last_updated`, " +
                 "u.`pnid`, u.`name` AS `owner_name`, " +
                 "    fc.`pid` AS `first_clear_pid`, \n" +
                 "    fc.`pnid` AS `first_clear_pnid`, \n" +
@@ -273,7 +273,14 @@ app.get("/api/course/search/:offset", courseRequestLimit, (req, res) => {
                 res.set('Pragma', 'no-cache');
                 res.set('Expires', '0');
                 res.set('Surrogate-Control', 'no-store');
-                res.status(200).end(JSON.stringify(rows));
+                console.log(rows)
+                rows = rows.map(row => ({
+                    ...row,
+                    clear_rate: (row.clears + row.failures)
+                        ? ((row.clears / (row.clears + row.failures)) * 100).toFixed(2)
+                        : "0.00"
+                }));
+                res.json(rows);
                 conn.end();
             }).catch(err => {
                 console.log(err);
@@ -294,8 +301,7 @@ app.get("/api/course/:pid", courseRequestLimit, (req, res) => {
     pool.getConnection()
         .then(conn => {
             conn.query("SELECT `levelid`, `levelcode`, l.`name`, `creation`, `ownerid`, `autoscroll`, `theme`, `subtheme`, `gamestyle`, `objcount`, `subobjcount`, `timelimit`, `stars`, `first_clear_time`,`best_clear_time`,`best_clear_score`," +
-                " `attempts`, `clears`, `thumb`, `preview`, `last_updated`, `deleted`," +
-
+                " `attempts`, `clears`, `failures`, `user_plays`, `thumb`, `preview`, `last_updated`, `deleted`," +
                 "u.`pnid`, u.`name` AS `owner_name`, " +
                 "    fc.`pid` AS `first_clear_pid`, \n" +
                 "    fc.`pnid` AS `first_clear_pnid`, \n" +
@@ -312,6 +318,9 @@ app.get("/api/course/:pid", courseRequestLimit, (req, res) => {
                     let row = rows[0]
                     console.log(row)
                     patchImages(row)
+                    row["clear_rate"] = (row.clears + row.failures)
+                        ? ((row.clears / (row.clears + row.failures)) * 100).toFixed(2)
+                        : "0.00";
                     res.set('Cache-Control', 'public, max-age=3600, stale-while-revalidate=14400');
                     res.status(200).end(JSON.stringify(row));
                     conn.end();
@@ -433,6 +442,8 @@ app.get("/course/:pid", courseRequestLimit, (req, res) => {
                 "    l.`stars`, \n" +
                 "    l.`attempts`, \n" +
                 "    l.`clears`, \n" +
+                "    l.`failures`, \n" +
+                "    l.`user_plays`, \n" +
                 "    l.`thumb`, \n" +
                 "    l.`preview`, \n" +
                 "    l.`last_updated`, \n" +
@@ -503,6 +514,13 @@ app.get("/course/:pid", courseRequestLimit, (req, res) => {
                         deleted: row.deleted == 1,
                         timelimit: row.timelimit,
                         gamestyle: row.gamestyle,
+                        attempts: row.attempts,
+                        clears: row.clears,
+                        failures: row.failures,
+                        clear_rate: (row.clears + row.failures)
+                            ? ((row.clears / (row.clears + row.failures)) * 100).toFixed(2)
+                            : "0.00",
+                        user_plays: row.user_plays,
                         theme: row.theme,
                         objcount: row.objcount,
                         subobjcount: row.subobjcount,
@@ -666,6 +684,8 @@ app.get('/course/:pid/viewer', (req, res) => {
                 "    l.`stars`, \n" +
                 "    l.`attempts`, \n" +
                 "    l.`clears`, \n" +
+                "    l.`failures`, \n" +
+                "    l.`user_plays`, \n" +
                 "    l.`thumb`, \n" +
                 "    l.`preview`, \n" +
                 "    l.`last_updated`, \n" +

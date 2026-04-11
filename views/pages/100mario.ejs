@@ -26,6 +26,7 @@
         Enter the Course ID on your Wii U console and use the buttons below accordingly<br>
         <img id="level-thumb" alt="Level Thumbnail"><br>
         <h4><b>First Clear:</b> <span id="firstclear"></span></h4>
+        <h4><b>Clear Rate:</b> <span id="clearrate"></span></h4>
         <br><br>
         <button id="skip">Skip</button> &nbsp;
         <button id="lost">Lost a live</button> &nbsp;
@@ -108,6 +109,7 @@
         $("#lives").text(getCookie("lives"));
         $("#level-name").text(currentCourse.name);
         $("#level-id").text(currentCourse.levelcode);
+        $("#clearrate").text(currentCourse.clear_rate+"%");
         $("#clears").text(getCookie("clears"));
         $("#level-thumb").attr("src", currentCourse.thumb);
 

@@ -47,7 +47,7 @@
                         const uploaded = new Date(timestamp2).toLocaleString();
 
                         // Construct the URL
-                        const url = `/partial/course?id=${levelData.levelid}&name=${encodeURIComponent(levelData.name)}&code=${levelData.levelcode}&stars=${levelData.stars}&userpid=${levelData.ownerid}&username=${encodeURIComponent(levelData.owner_name)}&userpnid=${levelData.pnid}&uploaded=${encodeURIComponent(uploaded)}&updated=${encodeURIComponent(updated)}`;
+                        const url = `/partial/course?id=${levelData.levelid}&name=${encodeURIComponent(levelData.name)}&code=${levelData.levelcode}&stars=${levelData.stars}&userpid=${levelData.ownerid}&username=${encodeURIComponent(levelData.owner_name)}&userpnid=${levelData.pnid}&uploaded=${encodeURIComponent(uploaded)}&updated=${encodeURIComponent(updated)}&clear_rate=${encodeURIComponent(levelData.clear_rate)}`;
 
                         // Return the $.get() request as a promise
                         return $.get(url);
