@@ -100,6 +100,8 @@ app.get("/api/course/search/:offset", courseRequestLimit, (req, res) => {
         maxstars,
         minobj,
         maxobj,
+        minclear,
+        maxclear,
         hasSubworld,
         sort,
         hasFirstClear,
@@ -188,6 +190,16 @@ app.get("/api/course/search/:offset", courseRequestLimit, (req, res) => {
         if (where !== "") where += " AND "
         where += "l.`objcount` <= ?"
         vars.push(maxobj)
+    }
+    if (minclear) {
+        if (where !== "") where += " AND "
+        where += "CASE WHEN (l.`clears` + l.`failures`) > 0 THEN (clears * 100.0 / (l.`clears` + l.`failures`)) ELSE 0 END >= ?"
+        vars.push(minclear)
+    }
+    if (maxclear) {
+        if (where !== "") where += " AND "
+        where += "CASE WHEN (l.`clears` + l.`failures`) > 0 THEN (clears * 100.0 / (l.`clears` + l.`failures`)) ELSE 0 END <= ?"
+        vars.push(maxclear)
     }
     if (hasSubworld && hasSubworld !== "ignore") {
         if (where !== "") where += " AND "

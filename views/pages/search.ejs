@@ -35,6 +35,11 @@
         <input type="number" id="minobj" name="minobj"/>
         <label for="maxobj">Maximum Objects:</label>
         <input type="number" id="maxobj" name="maxobj"/><br>
+        <label for="minclear">Minimum Clear-Rate (%):</label>
+        <input type="number" min="0" max="100" id="minclear" name="minclear" step=".01"/>
+        <label for="maxclear">Maximum Clear-Rate (%):</label>
+        <input type="number" min="0" max="100" id="maxclear" name="maxclear" step=".01"/><br>
+
         <label for="hasSubworld">Has Subworld</label><br>
         <select id="hasSubworld" name="hasSubworld">
             <option value="ignore" selected>No Preference</option>
