@@ -475,17 +475,17 @@ async def fetchRandomLevels(cli):
     print("Found %d objects" % len(objects))
     async with anyio.create_task_group() as tg:
         for o in objects:
-            tg.start_soon(run, o)
+            tg.start_soon(run,cli, o)
 
 
-async def run(obj):
+async def run(cli, obj):
     try:
         level: DataStoreCustomRankingResult = obj
         print(level.metaInfo.name)
         get = datastore_smm.DataStorePrepareGetParam()
         get.data_id = level.metaInfo.data_id
         print(getLevelCode(get.data_id))
-        await process_smm_level(level.metaInfo.data_id, level.metaInfo)
+        await process_smm_level(cli, level.metaInfo.data_id)
     except Exception as e:
         logging.exception(e)
 
@@ -656,7 +656,7 @@ def main():
     global connection
     connection = mariadb.connect(**conn_params)
 
-    asyncio.run(test())
+    #asyncio.run(test())
     while True:
         time.sleep(1)
         p = multiprocessing.Process(target=start,
