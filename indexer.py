@@ -8,6 +8,7 @@ import multiprocessing
 import os
 import struct
 import time
+import sys
 
 import anyio
 import mariadb
@@ -19,6 +20,7 @@ from nintendo.nex import backend, settings, streams, common, rmc, ranking, ranki
 from nintendo.nex import datastore_smm
 from nintendo.nex.authentication import AuthenticationInfo
 from nintendo.nex.common import logger, RMCError
+from nintendo.nex.rmc import RMCResponse
 
 from PretendoClients.nintendo.nex.datastore_smm import DataStoreRatingInfoWithSlot, DataStoreMetaInfo, \
     DataStoreGetMetaParam
@@ -27,6 +29,8 @@ from decompress import Course
 connection: Connection = None
 
 logging.basicConfig(level=logging.INFO)
+
+sem = asyncio.Semaphore(5) #Limiting parallel processing
 
 
 class DataStoreCustomRankingResult(common.Structure):
@@ -377,8 +381,7 @@ KNOWN_CUSTOM_RANKING_APPLICATION_IDS = [
 ]
 
 
-async def process_smm_level(cli, level_id: int):
-
+async def process_smm_level(cli, level_id: int, meta: DataStoreMetaInfo = None):
     print(level_id)
 
     param = datastore_smm.DataStorePrepareGetParam()
@@ -395,24 +398,21 @@ async def process_smm_level(cli, level_id: int):
         else:
             print(e.result().name())
         return
-    metaparam = datastore_smm.DataStoreGetMetaParam()
-    metaparam.data_id = level_id
-    metaparam.persistence_target = datastore_smm.DataStorePersistenceTarget()
-    metaparam.persistence_target.owner_id = 0
-    metaparam.persistence_target.persistence_id = 0xFFFF
-    metaparam.result_option = 6
-    metaparam.access_password = 0
-    meta: DataStoreMetaInfo = await cli.get_meta(metaparam)
+    if meta is None:
+        print("Generating new meta")
+        metaparam = datastore_smm.DataStoreGetMetaParam()
+        metaparam.data_id = level_id
+        metaparam.persistence_target = datastore_smm.DataStorePersistenceTarget()
+        metaparam.persistence_target.owner_id = 0
+        metaparam.persistence_target.persistence_id = 0xFFFF
+        metaparam.result_option = 6
+        metaparam.access_password = 0
+        meta = await cli.get_meta(metaparam)
 
     s3_headers = {header.key: header.value for header in get_object_response.headers}
     s3_url = get_object_response.url
     data_id = get_object_response.data_id
-    object_version = 0  # int(s3_url.split('/')[-1].split('-')[1].split('?')[0])
 
-    if not should_download_object(data_id, get_object_response.size, object_version):
-        # * Object data already downloaded
-        print("Skipping %d" % data_id)
-        return
 
     buffer_queues = []
 
@@ -441,50 +441,55 @@ async def process_smm_level(cli, level_id: int):
         print("Updating record users...")
         print(course_records[0])
         await updateUserInDB(course_records[0]["first_pid"])
-        await updateUserInDB(course_records[0]["best_pid"])
-
-
-
-
+        if course_records[0]["best_pid"] != course_records[0]["first_pid"]:
+            await updateUserInDB(course_records[0]["best_pid"])
 
     await updateUserInDB(meta.owner_id)
-
-
-
     updateLevelInDB(meta, course, course_records, buffer_queues)
+
+async def process_smm_levels(cli, level_ids: list[int]):
+    print(level_ids)
+    print("Requested Length: "+str(len(level_ids)))
+
+    metaparam = datastore_smm.DataStoreGetMetaParam()
+    metaparam.persistence_target = datastore_smm.DataStorePersistenceTarget()
+    metaparam.persistence_target.owner_id = 0
+    metaparam.persistence_target.persistence_id = 0xFFFF
+    metaparam.result_option = 6
+    metaparam.access_password = 0
+    meta: list[DataStoreMetaInfo]= (await cli.get_metas(level_ids, metaparam)).info
+    print("Returned Length: "+str(len(meta)))
+
+    async def worker(m):
+        async with sem:
+            return await process_smm_level(cli, m.data_id, m)
+
+    tasks = [asyncio.create_task(worker(m)) for m in meta]
+    await asyncio.gather(*tasks)
 
 
 async def updateUserInDB(pid):
-    return
     nas = nnas.NNASClient()
     mii = await nas.get_mii(pid)
     sql = "INSERT INTO users (pid, name, pnid) VALUES (?,?,?) ON DUPLICATE KEY UPDATE name = VALUES(name), pnid = VALUES(pnid)"
     data = (pid, mii.name, mii.nnid)
-
     connection.cursor().execute(sql, data)
-
     connection.commit()
+
 
 async def fetchRandomLevels(cli):
     param = DataStoreSearchParam()
     param.result_range.size = int(os.getenv("SMMDB_MAXLEVELS", "20"))
     objects = await getCourses(cli, param)
     print("Found %d objects" % len(objects))
-    async with anyio.create_task_group() as tg:
-        for o in objects:
-            tg.start_soon(run,cli, o)
+    async def worker(o):
+        level: DataStoreCustomRankingResult = o
+        async with sem:
+            return await process_smm_level(cli, level.metaInfo.data_id, level.metaInfo)
+    tasks = [asyncio.create_task(worker(o)) for o in objects]
+    await asyncio.gather(*tasks)
 
 
-async def run(cli, obj):
-    try:
-        level: DataStoreCustomRankingResult = obj
-        print(level.metaInfo.name)
-        get = datastore_smm.DataStorePrepareGetParam()
-        get.data_id = level.metaInfo.data_id
-        print(getLevelCode(get.data_id))
-        await process_smm_level(cli, level.metaInfo.data_id)
-    except Exception as e:
-        logging.exception(e)
 
 class ClientManager:
     def __init__(self):
@@ -576,6 +581,11 @@ def updateLevelInDB(level, course, records, buffer_queues):
         bestClearTime = records[0]["updated_time"]["original_value"]
         bestClearScore = records[0]["best_score"]
 
+    if clears > 0 and firstClearPid is None:
+        print("ERROR no first clear")
+        print(level.data_id)
+        time.sleep(3)
+
     print("Storing "+level.name+" into the database...")
     sql = "INSERT INTO levels (levelid, levelcode, name, creation, ownerid, autoscroll, subautoscroll, theme, subtheme, gamestyle, objcount, subobjcount, timelimit, stars, first_clear_pid,first_clear_time,best_clear_pid,best_clear_time,best_clear_score, attempts,clears, failures, user_plays, thumb, preview, last_updated, overworld, subworld) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) ON DUPLICATE KEY UPDATE name = VALUES(name), thumb = VALUES(thumb), preview = VALUES(preview), last_updated = VALUES(last_updated), stars = VALUES(stars), attempts = VALUES(attempts), clears = VALUES(clears),failures = VALUES(failures),user_plays = VALUES(user_plays), subautoscroll = VALUES(subautoscroll), overworld = VALUES(overworld), subworld = VALUES(subworld), first_clear_pid = VALUES(first_clear_pid), first_clear_time = VALUES(first_clear_time), best_clear_pid = VALUES(best_clear_pid), best_clear_time = VALUES(best_clear_time), best_clear_score = VALUES(best_clear_score)"
     data = (level.data_id,
@@ -616,8 +626,10 @@ def start():
     asyncio.run(startAsync())
 
 async def startAsync():
+    print("Fetching random levels")
     async with ClientManager() as client:
         await fetchRandomLevels(client)
+    print("Fetching DB levels")
     async with ClientManager() as client:
         await updateRandomLevels(client)
 
@@ -627,20 +639,23 @@ async def updateRandomLevels(cli):
             SELECT `levelid`
             FROM levels
             ORDER BY RAND()
-            LIMIT 25;
+            LIMIT 50;
             """
 
     cursor.execute(query)
     rows = cursor.fetchall()
-
-    tasks = [process_smm_level(cli,row[0]) for row in rows]
-    await asyncio.gather(*tasks)
+    rows = [int(row[0]) for row in rows]
+    await process_smm_levels(cli,rows)
 
 async def test():
     async with ClientManager() as client:
-        await process_smm_level(client, 942943)
+        await process_smm_level(client, 1029664)
+        #await fetchRandomLevels(client)
         #await updateRandomLevels(client)
-        #await fetchRandomLevels()
+
+async def runManual(levelid):
+    async with ClientManager() as client:
+        await process_smm_level(client, levelid)
 
 def main():
     conn_params = {
@@ -653,13 +668,16 @@ def main():
     global connection
     connection = mariadb.connect(**conn_params)
 
+    if(len(sys.argv)==2):
+        asyncio.run(runManual(int(sys.argv[1])))
+        return
     #asyncio.run(test())
     while True:
         time.sleep(1)
         p = multiprocessing.Process(target=start,
                                     args=())
         p.start()
-        p.join(30)
+        p.join(60)
         if p.is_alive():
             print("process stuck... let's kill it...")
             p.terminate()
