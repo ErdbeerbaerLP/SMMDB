@@ -361,8 +361,8 @@ def should_download_object(data_id, size, object_version):
     return True
 
 
-#KNOWN_BUFFER_QUEUE_SLOTS = [2]
-KNOWN_BUFFER_QUEUE_SLOTS = [0, 2, 3, 1, 4]
+KNOWN_BUFFER_QUEUE_SLOTS = [2]
+#KNOWN_BUFFER_QUEUE_SLOTS = [0, 2, 3, 1, 4]
 KNOWN_COURSE_RECORD_SLOTS = [0]
 KNOWN_CUSTOM_RANKING_APPLICATION_IDS = [
     0,
@@ -419,9 +419,6 @@ async def process_smm_level(cli, level_id: int):
     async with anyio.create_task_group() as tg:
         for slot in KNOWN_BUFFER_QUEUE_SLOTS:
             tg.start_soon(download_object_buffer_queues, cli,buffer_queues, data_id, slot)
-
-    for bq in buffer_queues:
-        print(len(bq["buffers"]))
 
     custom_rankings = []
 
