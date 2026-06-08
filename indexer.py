@@ -631,14 +631,15 @@ async def startAsync():
         await fetchRandomLevels(client)
     print("Fetching DB levels")
     async with ClientManager() as client:
-        await updateRandomLevels(client)
+        await updateOldestLevels(client)
 
-async def updateRandomLevels(cli):
+async def updateOldestLevels(cli):
     cursor = connection.cursor()
     query = """
             SELECT `levelid`
             FROM levels
-            ORDER BY RAND()
+            WHERE deleted = 0
+            ORDER BY `last_updated` ASC
             LIMIT 50;
             """
 
