@@ -13,6 +13,7 @@ import sys
 import anyio
 import mariadb
 from anynet import http
+from anynet.http import HTTPResponse
 from anynet.util import catch
 from mariadb import Connection
 from nintendo import nnas
@@ -383,21 +384,23 @@ KNOWN_CUSTOM_RANKING_APPLICATION_IDS = [
 
 async def process_smm_level(cli, level_id: int, meta: DataStoreMetaInfo = None):
     print(level_id)
-
     param = datastore_smm.DataStorePrepareGetParam()
     param.data_id = level_id
+    get_object_response = None
     try:
         get_object_response = await cli.prepare_get_object(param)
     except RMCError as e:
         if e.result().name() == "DataStore::NotFound":
-            sql = "UPDATE levels SET deleted = 1 WHERE levelid = ?"
-            data = (level_id,)
+            sql = "UPDATE levels SET deleted = 1, last_updated = ? WHERE levelid = ?"
+            data = (time.time(),input)
             connection.cursor().execute(sql, data)
             connection.commit()
             print("Marked level as deleted!" )
         else:
             print(e.result().name())
         return
+    print(get_object_response)
+    print("Hello")
     if meta is None:
         print("Generating new meta")
         metaparam = datastore_smm.DataStoreGetMetaParam()
@@ -432,8 +435,16 @@ async def process_smm_level(cli, level_id: int, meta: DataStoreMetaInfo = None):
         for slot in KNOWN_COURSE_RECORD_SLOTS:
             tg.start_soon(download_course_record, cli,course_records, data_id, slot)
 
-    s3_response = await http.get(s3_url, headers=s3_headers)
+    s3_response:HTTPResponse = await http.get(s3_url, headers=s3_headers)
 
+    print(s3_response.status_code)
+    if s3_response.status_code == 404:
+        sql = "UPDATE levels SET deleted = 1, last_updated = ? WHERE levelid = ?"
+        data = (time.time(),input)
+        connection.cursor().execute(sql, data)
+        connection.commit()
+        print("Marked level as deleted!" )
+        return
     course = Course(s3_response.body)
 
 
@@ -450,21 +461,31 @@ async def process_smm_level(cli, level_id: int, meta: DataStoreMetaInfo = None):
 async def process_smm_levels(cli, level_ids: list[int]):
     print(level_ids)
     print("Requested Length: "+str(len(level_ids)))
-
     metaparam = datastore_smm.DataStoreGetMetaParam()
     metaparam.persistence_target = datastore_smm.DataStorePersistenceTarget()
     metaparam.persistence_target.owner_id = 0
     metaparam.persistence_target.persistence_id = 0xFFFF
     metaparam.result_option = 6
     metaparam.access_password = 0
-    meta: list[DataStoreMetaInfo]= (await cli.get_metas(level_ids, metaparam)).info
+    meta: list[DataStoreMetaInfo] = (await cli.get_metas(level_ids, metaparam)).info
     print("Returned Length: "+str(len(meta)))
+    if(len(level_ids) == len(meta)):
+        for inp,output in zip(level_ids, meta):
+            if output == 0:
+                sql = "UPDATE levels SET deleted = 1, last_updated = ? WHERE levelid = ?"
+                data = (time.time(),inp)
+                connection.cursor().execute(sql, data)
+                connection.commit()
+                print("Marked level as deleted!" )
 
+
+
+    print("===========")
     async def worker(m):
         async with sem:
             return await process_smm_level(cli, m.data_id, m)
 
-    tasks = [asyncio.create_task(worker(m)) for m in meta]
+    tasks = [asyncio.create_task(worker(m)) for m in meta if m.data_id != 0]
     await asyncio.gather(*tasks)
 
 
