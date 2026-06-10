@@ -440,7 +440,7 @@ async def process_smm_level(cli, level_id: int, meta: DataStoreMetaInfo = None):
     print(s3_response.status_code)
     if s3_response.status_code == 404:
         sql = "UPDATE levels SET deleted = 1, last_updated = ? WHERE levelid = ?"
-        data = (time.time(),input)
+        data = (time.time(),level_id)
         connection.cursor().execute(sql, data)
         connection.commit()
         print("Marked level as deleted!" )
