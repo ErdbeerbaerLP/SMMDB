@@ -55,6 +55,14 @@ const courseThumbRequestLimit = rateLimit({
     message: "Please do not spam the API :<",
     validate: {xForwardedForHeader: true}
 })
+const statAPILimit = rateLimit({
+    windowMs: 5 * 60 * 1000,
+    limit: 500,
+    standardHeaders: 'draft-8',
+    legacyHeaders: false,
+    message: "Please do not spam the API :< - Limited to 500 requests per 5 minutes",
+    validate: {xForwardedForHeader: true}
+})
 
 let pool = createPool();
 
@@ -349,10 +357,10 @@ app.get("/api/course/:pid", courseRequestLimit, (req, res) => {
     });
 });
 
-app.get("/api/stats", (req, res) => {
+app.get("/api/stats",statAPILimit, (req, res) => {
     pool.getConnection()
         .then(conn => {
-            conn.query("SELECT (SELECT COUNT(`levelid`) FROM `levels`) AS levelcount,  (SELECT COUNT(`pid`) FROM `users`) AS usercount;")
+            conn.query("SELECT l.levelcount, l.uncleared_levels, l.total_stars_given, l.total_attempts, l.total_failures, u.usercount FROM (SELECT COUNT(*) AS levelcount, CAST(SUM(CASE WHEN clears = 0 AND first_clear_pid IS NULL THEN 1 ELSE 0 END) AS UNSIGNED) AS uncleared_levels, CAST(SUM(stars) AS UNSIGNED) AS total_stars_given, CAST(SUM(user_plays) AS UNSIGNED) AS total_attempts, CAST(SUM(failures) AS UNSIGNED) AS total_failures FROM levels WHERE deleted = false) AS l CROSS JOIN (SELECT COUNT(*) AS usercount FROM users) AS u;")
                 .then((rows) => {
                     let row = rows[0]
                     res.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
